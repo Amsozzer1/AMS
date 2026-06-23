@@ -1,0 +1,29 @@
+# AMS-X deployment for the CasaOS host (Docker-native).
+# Brings up the Brain (server) + our own MQTT broker (Mosquitto).
+# Scaffold: the server image build target is added when the app entrypoint exists.
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: amsx-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"   # MQTT (printers + ESP32 clusters)
+      - "9001:9001"   # MQTT over websockets (optional, for the dashboard)
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+
+  # server:
+  #   build: ../server
+  #   container_name: amsx-server
+  #   restart: unless-stopped
+  #   depends_on: [mosquitto]
+  #   ports:
+  #     - "8000:8000"          # FastAPI dashboard + 3MF upload
+  #   volumes:
+  #     - ../server/config:/app/config:ro   # ams.local.yaml (gitignored)
+  #   # network_mode: host     # may be needed for LAN discovery / printer FTPS
+
+volumes:
+  mosquitto-data:

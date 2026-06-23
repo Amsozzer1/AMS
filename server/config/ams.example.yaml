@@ -1,0 +1,30 @@
+# AMS-X config (example). Copy to ams.local.yaml and fill in real values.
+# ams.local.yaml is gitignored — never commit real serials / access codes.
+# Shape mirrors `Config` in docs/10-domain-model.md.
+
+bus:
+  # our own MQTT broker (Mosquitto on the CasaOS host)
+  host: 127.0.0.1
+  port: 1883
+
+printers:
+  - id: x1c-1
+    model: x1            # x1 | p1 | a1   -> selects the PrinterDriver
+    serial: "REPLACE_ME"
+    access_code: "REPLACE_ME"   # from the printer's LAN-mode network settings
+    ip: "192.168.1.50"
+
+clusters:
+  - id: cluster-a
+    mqtt_topic: amsx/cluster-a   # ESP32 subscribes/publishes here
+    module_ids: [m1, m2, m3, m4]
+
+modules:
+  - { id: m1, cluster_id: cluster-a, filament_index: 0, spool_ref: null }
+  - { id: m2, cluster_id: cluster-a, filament_index: 1, spool_ref: null }
+  - { id: m3, cluster_id: cluster-a, filament_index: 2, spool_ref: null }
+  - { id: m4, cluster_id: cluster-a, filament_index: 3, spool_ref: null }
+
+hub:
+  # mostly informational for now (passive Y-connector per printer)
+  x1c-1: { type: y-connector, inputs: 4 }
