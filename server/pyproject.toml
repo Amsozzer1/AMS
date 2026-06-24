@@ -11,6 +11,7 @@ authors = [{ name = "AMS-X" }]
 dependencies = [
     "fastapi>=0.115",          # api/ — dashboard, 3MF upload, live state
     "uvicorn[standard]>=0.32", # ASGI server
+    "python-multipart>=0.0.9", # api/ — multipart 3MF upload (FastAPI UploadFile)
     "paho-mqtt>=2.1",          # transport/ — our own MQTT bus (printers + clusters)
     "pydantic>=2.9",           # typed models for the domain layer
     "pydantic-settings>=2.5",  # config/ loading

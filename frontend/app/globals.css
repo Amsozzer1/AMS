@@ -1,0 +1,497 @@
+:root {
+  --bg: #0f1115;
+  --panel: #181b22;
+  --panel-2: #1f232c;
+  --border: #2a2f3a;
+  --text: #e6e8ec;
+  --muted: #9aa3b0;
+  --accent: #4f8cff;
+  --good: #34c759;
+  --warn: #ffb020;
+  --bad: #ff5a5a;
+  --prompt: #ffcc33;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  line-height: 1.45;
+}
+
+a {
+  color: var(--accent);
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+header.app-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+header.app-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.health-pill {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.health-pill .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: var(--bad);
+  vertical-align: middle;
+}
+
+.health-pill.ok .dot {
+  background: var(--good);
+}
+
+section {
+  margin-bottom: 36px;
+}
+
+section > h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+/* ---- Prompt panel (the money-shot) ---- */
+
+.prompt-panel {
+  border: 2px solid transparent;
+  border-radius: 12px;
+}
+
+.prompt-panel.active {
+  border-color: var(--prompt);
+  background: rgba(255, 204, 51, 0.06);
+  padding: 16px;
+  box-shadow: 0 0 0 4px rgba(255, 204, 51, 0.12);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(255, 204, 51, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 204, 51, 0.18);
+  }
+}
+
+.prompt-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--panel-2);
+  border: 1px solid var(--prompt);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.prompt-card:last-child {
+  margin-bottom: 0;
+}
+
+.prompt-card .msg {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.prompt-card .module {
+  font-size: 12px;
+  color: var(--prompt);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-done {
+  background: var(--good);
+  color: #04210d;
+  border-color: var(--good);
+  font-size: 16px;
+  padding: 12px 28px;
+}
+
+.prompt-empty {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+/* ---- Printer cards ---- */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.card .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.card .pid {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.stage-badge {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row .k {
+  color: var(--muted);
+}
+
+.sensor-on {
+  color: var(--good);
+}
+
+.sensor-off {
+  color: var(--muted);
+}
+
+.progress {
+  height: 8px;
+  background: var(--panel-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  margin-right: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  vertical-align: middle;
+}
+
+/* ---- Upload ---- */
+
+.upload-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.upload-form select,
+.upload-form input[type="file"] {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.error {
+  color: var(--bad);
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.swap-plan {
+  margin-top: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.swap-plan table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.swap-plan th,
+.swap-plan td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.swap-plan th {
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+/* ---- Card as link (drill-in) ---- */
+
+.card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.12s ease,
+    transform 0.12s ease;
+}
+
+.card-link:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.card-cta {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* ---- Detail view ---- */
+
+.back-link {
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.detail-field-k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.detail-field-v {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag-sim,
+.tag-warn {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.tag-sim {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.tag-warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+/* ---- HMS health messages ---- */
+
+.hms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hms-item {
+  background: rgba(255, 90, 90, 0.08);
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.hms-item code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---- Raw JSON tree ---- */
+
+.raw-tree {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  overflow-x: auto;
+}
+
+.jt-row {
+  display: flex;
+  gap: 10px;
+  padding: 2px 0;
+  line-height: 1.5;
+}
+
+.jt-key {
+  color: var(--muted);
+}
+
+.jt-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 0;
+  text-align: left;
+}
+
+.jt-toggle:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.jt-caret {
+  display: inline-block;
+  width: 12px;
+  color: var(--accent);
+}
+
+.jt-summary {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.jt-children {
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+
+.jt-null {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.jt-bool {
+  color: var(--warn);
+}
+
+.jt-num {
+  color: var(--accent);
+}
+
+.jt-str {
+  color: var(--good);
+  word-break: break-word;
+}

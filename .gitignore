@@ -62,3 +62,7 @@ docs/media/*.png
 docs/media/*.jpg
 docs/media/*.jpeg
 !docs/media/README.md
+.claude
+.vscode
+CLAUDE.md
+tmp
