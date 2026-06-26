@@ -349,6 +349,37 @@ async def test_rearm_detaches_old_orchestrator_no_double_swap():
     assert printer.calls.count("routine_confirm_resume") == 1  # exactly ONE swap, not two
 
 
+async def test_module_resolver_overrides_registry():
+    """SELECTING drives the module from the injected resolver, not the static config map.
+
+    The config registry maps filament_index 1 → mod-b; the resolver forces 1 → mod-c. The swap
+    must drive mod-c (this is what wires the operator's confirmed colour→module assignment in).
+    """
+    prompts: list[str] = []
+    printer = FakePrinter(trip_after_polls=1)
+    registry = _registry(prompts)
+    orch = Orchestrator(
+        printer,
+        _plan(),
+        registry,
+        EventBus(),
+        printer_id=PRINTER_ID,
+        sense_timeout_s=2.0,
+        sense_poll_s=0.01,
+        module_resolver=lambda idx: registry.by_id("mod-c")
+        if idx == 1
+        else registry.for_filament_index(idx),
+    )
+    orch.subscribe()
+
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.CHANGE, tag="AMSX-SWAP-0")
+    )
+    assert orch.cursor == 1 and not orch.held
+    assert any("mod-c" in p for p in prompts)  # resolver's module was driven
+    assert not any("mod-b" in p for p in prompts)  # NOT the static config map's module
+
+
 # ---------------------------------------------------------------------------------------------
 # Sensor timeout → FAULT + safe-hold.
 # ---------------------------------------------------------------------------------------------

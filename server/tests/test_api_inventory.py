@@ -159,3 +159,35 @@ def test_job_assignment_get_post_get_round_trip():
         # index 0 (loaded from start) must be unchanged.
         assert rows_by_index[0]["module"] == "m1"
         assert rows_by_index[0]["status"] == "loaded"
+
+
+async def test_brain_module_resolver_prefers_confirmed_assignment():
+    """The orchestrator's module resolver prefers the confirmed assignment over the config map."""
+    brain = _brain_with_store()
+    await brain.start()
+    # config maps index 0 -> m1, index 1 -> m2. Confirm index 0 -> m2 (override of m1).
+    brain.assignment["x1c-1"] = {
+        0: ProposedRow(
+            index=0,
+            material="PLA",
+            color_hex="FFFFFF",
+            grams=None,
+            module="m2",
+            spool_id=None,
+            status="loaded",
+        )
+    }
+    resolve = brain._module_resolver_for("x1c-1")
+    assert resolve(0).id == "m2"  # confirmed assignment wins (config would give m1)
+    assert resolve(1).id == "m2"  # no assignment for index 1 -> config fallback (m2)
+    await brain.stop()
+
+
+async def test_brain_module_resolver_falls_back_to_config():
+    """With no assignment, the resolver uses the static config registry map."""
+    brain = _brain_with_store()
+    await brain.start()
+    resolve = brain._module_resolver_for("x1c-1")
+    assert resolve(0).id == "m1"  # config: index 0 -> m1
+    assert resolve(1).id == "m2"  # config: index 1 -> m2
+    await brain.stop()

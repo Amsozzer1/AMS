@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from .config import Config, load_config
@@ -247,6 +248,26 @@ class Brain:
         except Exception:  # SOFT — consume errors must not surface to the operator
             log.warning("brain: consume_plan failed for %s (soft)", printer_id, exc_info=True)
 
+    def _module_resolver_for(self, printer_id: PrinterId) -> Callable[[int], Module]:
+        """Build a ``filament_index -> Module`` resolver for one printer's orchestrator.
+
+        Prefers the operator's CONFIRMED colour→module assignment, falling back to the static
+        config registry map. Reads ``self.assignment`` lazily (at swap time), so a confirmation
+        POSTed AFTER the job is armed takes effect on the next swap.
+        """
+
+        def _resolve(index: int) -> Module:
+            assert self.registry is not None  # arm_job guarantees the brain is started
+            row = self.assignment.get(printer_id, {}).get(index)
+            if row is not None and row.module is not None:
+                try:
+                    return self.registry.by_id(row.module)
+                except KeyError:
+                    pass  # assigned module not in the registry → fall back
+            return self.registry.for_filament_index(index)
+
+        return _resolve
+
     # ---- the front-end entry point ----
     async def arm_job(self, printer_id: PrinterId, file: str | Path) -> Orchestrator:
         """Parse a sliced 3MF and arm the orchestrator for the swaps — WITHOUT pushing/starting.
@@ -268,7 +289,14 @@ class Brain:
         if previous is not None:
             previous.unsubscribe()
             log.info("re-arming %s: detached previous orchestrator", printer_id)
-        orch = Orchestrator(printer, plan, self.registry, self.events, printer_id=printer_id)
+        orch = Orchestrator(
+            printer,
+            plan,
+            self.registry,
+            self.events,
+            printer_id=printer_id,
+            module_resolver=self._module_resolver_for(printer_id),
+        )
         orch.subscribe()
         self.orchestrators[printer_id] = orch
         # New job: clear any previous confirmation so the operator must re-confirm.

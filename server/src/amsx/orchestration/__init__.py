@@ -310,10 +310,16 @@ class Orchestrator:
         sense_poll_s: float = DEFAULT_SENSE_POLL_S,
         layer_tolerance: int = DEFAULT_LAYER_TOLERANCE,
         line_tolerance: int = DEFAULT_LINE_TOLERANCE,
+        module_resolver: Callable[[int], Module] | None = None,
     ) -> None:
         self.printer = printer
         self.plan = plan
         self.registry = registry
+        # filament_index -> Module. Defaults to the static config map; the Brain passes a resolver
+        # that prefers the operator's confirmed colour→module assignment, falling back to config.
+        self._module_for_index: Callable[[int], Module] = (
+            module_resolver or registry.for_filament_index
+        )
         self.bus = bus
         self.printer_id = printer_id
         self.sm = sm or SwapStateMachine()
@@ -402,9 +408,9 @@ class Orchestrator:
             await self._alert(unguarded)
 
         async with self._swap_lock:
-            # TODO: SELECTING still uses the static config registry map — brain.assignment is not
-            # yet wired here, so the confirmed colour→module mapping has no effect on swap routing.
-            next_module = self.registry.for_filament_index(swap.filament_index)
+            # SELECTING: resolve the module via the injected resolver (operator's confirmed
+            # colour→module assignment, falling back to the static config map).
+            next_module = self._module_for_index(swap.filament_index)
             old_module = self._current_old_module()
             log.info(
                 "orchestrator [%s]: pause ACCEPTED as swap #%d → running swap (module %s)",
@@ -544,7 +550,7 @@ class Orchestrator:
         if self._loaded_index is None:
             return None
         try:
-            return self.registry.for_filament_index(self._loaded_index)
+            return self._module_for_index(self._loaded_index)
         except KeyError:
             return None
 
