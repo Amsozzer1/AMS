@@ -21,7 +21,7 @@ from ..brain import Brain, build_brain
 from ..events import PauseEvent, SensorEvent
 from ..orchestration import Orchestrator
 from ..printer import Printer
-from ..types import PauseReason
+from ..types import PauseReason, Spool
 
 log = logging.getLogger("amsx.api")
 
@@ -223,6 +223,96 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         if orch is None:
             return {"armed": False, "printer_id": printer_id}
         return _orchestrator_status(orch)
+
+    # ---- spool inventory proxy endpoints ------------------------------------------------
+    def _spool_dict(s: Spool) -> dict[str, Any]:
+        return {
+            "id": s.id,
+            "filament_id": s.filament_id,
+            "material": s.material,
+            "color_hex": s.color_hex,
+            "name": s.name,
+            "remaining_g": s.remaining_g,
+            "module": s.module,
+            "archived": s.archived,
+        }
+
+    @app.get("/api/spools")
+    async def list_spools(include_archived: bool = False) -> list[dict[str, Any]]:
+        """List all spools from the inventory (Spoolman or fake)."""
+        spools = await _brain().store.list_spools(include_archived=include_archived)
+        return [_spool_dict(s) for s in spools]
+
+    @app.get("/api/printers/{printer_id}/loadout")
+    async def get_loadout(printer_id: str) -> list[dict[str, Any]]:
+        """Current spool→module mapping for every configured module on this printer."""
+        b = _brain()
+        if printer_id not in b.printers:
+            raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        rows = []
+        for mc in b.config.modules:
+            spool = await b.store.loaded_in(mc.id)
+            rows.append({"module": mc.id, "spool": _spool_dict(spool) if spool else None})
+        return rows
+
+    @app.put("/api/printers/{printer_id}/loadout")
+    async def set_loadout(printer_id: str, module: str, spool_id: str) -> dict[str, Any]:
+        """Assign a spool to a module (writes `set_module` on the store)."""
+        b = _brain()
+        if printer_id not in b.printers:
+            raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        await b.store.set_module(spool_id, module)
+        return {"ok": True}
+
+    @app.get("/api/printers/{printer_id}/job/assignment")
+    async def get_assignment(printer_id: str) -> dict[str, Any]:
+        """Current spool-assignment proposal for the armed job on this printer.
+
+        Returns rows (one per filament index from the plan), each with the module/spool the
+        resolver proposed. `confirmed` is True once the operator has POST-confirmed the mapping.
+        Returns empty rows + confirmed=False when no job is armed.
+        """
+        b = _brain()
+        if printer_id not in b.printers:
+            raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        proposal = b.assignment.get(printer_id, {})
+        rows = []
+        for _idx, row in sorted(proposal.items()):
+            rows.append(
+                {
+                    "index": row.index,
+                    "material": row.material,
+                    "color_hex": row.color_hex,
+                    "grams": row.grams,
+                    "module": row.module,
+                    "spool_id": row.spool_id,
+                    "status": row.status,
+                }
+            )
+        return {"rows": rows, "confirmed": False}
+
+    @app.post("/api/printers/{printer_id}/job/assignment")
+    async def confirm_assignment(printer_id: str, body: dict[str, str]) -> dict[str, Any]:
+        """Confirm (and optionally override) the index→module mapping.
+
+        Body: `{index: module_id}` for each filament index. For gap rows where a module is now
+        assigned, writes `set_module` on the store so the spool knows where it lives.
+        Returns `{ok: true}`.
+        """
+        b = _brain()
+        if printer_id not in b.printers:
+            raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        proposal = b.assignment.get(printer_id, {})
+        for index_str, module_id in body.items():
+            try:
+                idx = int(index_str)
+            except ValueError:
+                continue
+            row = proposal.get(idx)
+            # If the row had a gap (no module) but operator now assigned one, update the store.
+            if row is not None and row.status == "gap" and row.spool_id:
+                await b.store.set_module(row.spool_id, module_id)
+        return {"ok": True}
 
     # ---- simulate-only test hooks --------------------------------------------------------
     # These let a client drive the swap loop without a printer: inject the pause the

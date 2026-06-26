@@ -19,6 +19,8 @@ from pathlib import Path
 
 from .config import Config, load_config
 from .events import EventBus
+from .inventory import FakeSpoolStore, SpoolStore
+from .inventory.resolver import ProposedRow, Resolver
 from .job import Job, JobParser
 from .module import Cluster, ManualModule, Module, ModuleRegistry
 from .orchestration import Orchestrator
@@ -124,6 +126,12 @@ class Brain:
         self.registry: ModuleRegistry | None = None
         self.orchestrators: dict[PrinterId, Orchestrator] = {}
 
+        # Spool inventory: populated in __init__ from config; tests may replace brain.store before
+        # start() is called.  assignment maps printer_id -> {filament_index -> ProposedRow}.
+        self.store: SpoolStore = FakeSpoolStore()
+        self.resolver: Resolver = Resolver(self.store)
+        self.assignment: dict[PrinterId, dict[int, ProposedRow]] = {}
+
         self._module_by_id: dict[ModuleId, Module] = {}
         self._printer_buses: dict[PrinterId, MqttBus] = {}
         self._started = False
@@ -135,6 +143,8 @@ class Brain:
             return
         self._bring_up_modules()
         await self._bring_up_printers()
+        # Ensure Spoolman has the custom field we need before any swap; SOFT (logs on error).
+        await self.store.ensure_module_field()
         self._started = True
         log.info(
             "Brain started (simulate=%s): %d printer(s), %d module(s), %d cluster(s)",
@@ -213,6 +223,12 @@ class Brain:
         orch = Orchestrator(printer, plan, self.registry, self.events, printer_id=printer_id)
         orch.subscribe()
         self.orchestrators[printer_id] = orch
+        # Compute a best-effort spool proposal for the operator; cached until re-arm.
+        try:
+            self.assignment[printer_id] = await self.resolver.propose(plan)
+        except Exception:
+            log.warning("resolver.propose failed for %s (soft)", printer_id, exc_info=True)
+            self.assignment.setdefault(printer_id, {})
         log.info("job armed on %s: %d planned swap(s)", printer_id, len(plan))
         return orch
 
@@ -232,4 +248,13 @@ class Brain:
 
 def build_brain(config_path: str | Path | None = None, *, simulate: bool = True) -> Brain:
     """Construct (not yet start) a Brain from a config file."""
-    return Brain(load_config(config_path or default_config_path()), simulate=simulate)
+    config = load_config(config_path or default_config_path())
+    brain = Brain(config, simulate=simulate)
+    if not simulate and config.spoolman.enabled:
+        from .inventory.spoolman import SpoolmanStore
+
+        brain.store = SpoolmanStore(config.spoolman)
+    else:
+        brain.store = FakeSpoolStore()
+    brain.resolver = Resolver(brain.store)
+    return brain
