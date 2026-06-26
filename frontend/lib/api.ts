@@ -127,6 +127,55 @@ export interface OrchestratorIdle {
 
 export type OrchestratorStatus = OrchestratorArmed | OrchestratorIdle;
 
+// ---- Spool inventory + colour→module mapping (api/__init__.py spool endpoints) ----
+
+// A spool of filament from the inventory (Spoolman or the fake store). `color_hex`
+// is a bare 6-hex RRGGBB string (no leading `#`); any field may be null when the
+// upstream record is sparse or Spoolman is unconfigured.
+export interface Spool {
+  id: string;
+  filament_id: string;
+  material: string | null;
+  color_hex: string | null;
+  name: string | null;
+  remaining_g: number | null;
+  module: string | null;
+  archived: boolean;
+}
+
+// One configured module on a printer and the spool currently loaded into it
+// (null when the module is empty). GET /api/printers/{id}/loadout returns one row
+// per configured module.
+export interface LoadoutRow {
+  module: string;
+  spool: Spool | null;
+}
+
+// One filament colour from the armed job's plan, with the module/spool the
+// resolver proposed. `status` is "loaded" when a module is mapped (and the
+// material/colour line up), or "gap" when the operator still needs to load this
+// colour somewhere.
+export interface AssignRow {
+  index: number;
+  material: string | null;
+  color_hex: string | null;
+  grams: number | null;
+  module: string | null;
+  spool_id: string | null;
+  status: "loaded" | "gap";
+}
+
+// GET /api/printers/{id}/job/assignment. `rows` is empty when nothing is armed.
+export interface AssignmentResponse {
+  rows: AssignRow[];
+  confirmed: boolean;
+}
+
+export interface StartArmedResult {
+  printer_id: string;
+  started: boolean;
+}
+
 // ---- Fetch helpers ----
 
 class ApiError extends Error {}
@@ -209,6 +258,92 @@ export async function submitJob(
     throw new ApiError(await extractError(res));
   }
   return (await res.json()) as JobResult;
+}
+
+// ---- Spool inventory + loadout + assignment ----
+
+/** All spools in the inventory. Returns `[]` (not an error) when the store is
+ *  empty; throws only on transport/HTTP failure so callers can show a calm empty
+ *  state when Spoolman is down or unconfigured. */
+export function listSpools(signal?: AbortSignal): Promise<Spool[]> {
+  return getJson<Spool[]>("/api/spools", signal);
+}
+
+/** Current spool→module loadout for a printer (one row per configured module). */
+export function getLoadout(id: string, signal?: AbortSignal): Promise<LoadoutRow[]> {
+  return getJson<LoadoutRow[]>(
+    `/api/printers/${encodeURIComponent(id)}/loadout`,
+    signal,
+  );
+}
+
+/** Assign a spool to a module. Returns `{ ok: true }`. */
+export async function setLoadout(
+  printerId: string,
+  module: string,
+  spoolId: string,
+): Promise<{ ok: boolean }> {
+  const res = await fetch(
+    `${API_BASE}/api/printers/${encodeURIComponent(printerId)}/loadout?module=${encodeURIComponent(module)}&spool_id=${encodeURIComponent(spoolId)}`,
+    { method: "PUT", cache: "no-store" },
+  );
+  if (!res.ok) {
+    throw new ApiError(await extractError(res));
+  }
+  return (await res.json()) as { ok: boolean };
+}
+
+/** The colour→module proposal for the armed job. `rows` is empty when nothing is
+ *  armed; the UI shows the mapping panel only once rows arrive. */
+export function getAssignment(
+  printerId: string,
+  signal?: AbortSignal,
+): Promise<AssignmentResponse> {
+  return getJson<AssignmentResponse>(
+    `/api/printers/${encodeURIComponent(printerId)}/job/assignment`,
+    signal,
+  );
+}
+
+/** Confirm (and optionally override) the index→module mapping. The body is keyed
+ *  by stringified filament index, as the server expects. Returns `{ ok: true }`. */
+export async function confirmAssignment(
+  printerId: string,
+  mapping: Record<number, string>,
+): Promise<{ ok: boolean }> {
+  const body: Record<string, string> = {};
+  for (const [index, moduleId] of Object.entries(mapping)) {
+    body[String(index)] = moduleId;
+  }
+  const res = await fetch(
+    `${API_BASE}/api/printers/${encodeURIComponent(printerId)}/job/assignment`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new ApiError(await extractError(res));
+  }
+  return (await res.json()) as { ok: boolean };
+}
+
+/** Push + start the job this printer is ALREADY armed with (does NOT re-arm, so
+ *  the confirmed mapping is preserved). Throws with the server's 409 detail when
+ *  nothing is armed, or 400 on a transport/start failure. */
+export async function startArmedJob(
+  printerId: string,
+): Promise<StartArmedResult> {
+  const res = await fetch(
+    `${API_BASE}/api/printers/${encodeURIComponent(printerId)}/job/start`,
+    { method: "POST", cache: "no-store" },
+  );
+  if (!res.ok) {
+    throw new ApiError(await extractError(res));
+  }
+  return (await res.json()) as StartArmedResult;
 }
 
 /** Resolve a pending human-swap prompt. `response` defaults to "done". */

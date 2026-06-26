@@ -1,7 +1,9 @@
 import HealthPill from "./components/HealthPill";
-import JobUpload from "./components/JobUpload";
+import JobFlow from "./components/JobFlow";
+import LoadoutPanel from "./components/LoadoutPanel";
 import PrinterCards from "./components/PrinterCards";
 import PromptPanel from "./components/PromptPanel";
+import SpoolInventory from "./components/SpoolInventory";
 import SwapStrip from "./components/SwapStrip";
 
 export default function Page() {
@@ -26,7 +28,21 @@ export default function Page() {
       <SwapStrip />
 
       <PrinterCards />
-      <JobUpload />
+
+      {/* Two-step job flow: pick a file → Upload & Arm → map colours → Confirm
+          & Start. The mapping panel appears once a printer is armed. */}
+      <JobFlow />
+
+      {/* Secondary: read-the-shop inventory + per-printer module loadout. */}
+      <section>
+        <div className="section-head">
+          <h2>Inventory &amp; loadout</h2>
+        </div>
+        <div className="inv-grid">
+          <SpoolInventory />
+          <LoadoutPanel />
+        </div>
+      </section>
     </main>
   );
 }

@@ -974,6 +974,294 @@ section > h2 {
 }
 
 /* =====================================================================
+   Filament mapping — colour → module worktable (Bambu-Studio-style)
+   A ruled table of one row per print colour: a real data swatch, material +
+   grams, a status badge, and a module <select>. Calm by default; gap rows are
+   called out in vermilion so the operator knows what to load.
+   ===================================================================== */
+
+.mapping {
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  box-shadow: var(--shadow-card);
+}
+.mapping.armed {
+  border-color: var(--run);
+  box-shadow: 0 0 0 1px var(--run), var(--shadow-card);
+}
+.mapping-sub {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--s-4);
+}
+
+.map-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.map-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: var(--paper-card);
+  border-bottom: 1px solid var(--line);
+}
+.map-row:last-child {
+  border-bottom: none;
+}
+.map-row.gap {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  padding-left: calc(var(--s-4) - 3px);
+}
+
+.map-idx {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  color: var(--ink-3);
+  font-weight: 700;
+}
+
+.map-colour {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+}
+.swatch-row {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid rgba(27, 26, 23, 0.25);
+  flex-shrink: 0;
+}
+.map-colour .meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.map-colour .mat {
+  font-size: var(--t-base);
+  color: var(--ink);
+  font-weight: 600;
+}
+.map-colour .grams {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+}
+
+/* status badge — loaded (forest) / gap (vermilion call-out) */
+.map-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.map-badge.loaded {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.map-badge.gap {
+  color: var(--accent);
+  background: var(--accent-on);
+  border: 1px solid var(--accent);
+}
+
+.map-select {
+  background: var(--paper-inset);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: var(--t-sm);
+  font-family: var(--font-mono);
+  min-width: 110px;
+}
+
+.mapping-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  margin-top: var(--s-5);
+  flex-wrap: wrap;
+}
+.mapping-actions .gap-note {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--accent-deep);
+  letter-spacing: 0.04em;
+}
+.mapping-actions .confirmed-note {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ok);
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+/* =====================================================================
+   Spool inventory + loadout — read/light-edit instrument lists
+   ===================================================================== */
+
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--s-4);
+}
+
+.panel {
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  box-shadow: var(--shadow-card);
+}
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line);
+}
+.panel-head h3 {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--ink-2);
+  margin: 0;
+  font-weight: 700;
+}
+.panel-head .count {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+}
+
+.spool-list {
+  display: flex;
+  flex-direction: column;
+}
+.spool-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.spool-item:last-child {
+  border-bottom: none;
+}
+.spool-item .meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.spool-item .name {
+  font-size: var(--t-sm);
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spool-item .sub {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  letter-spacing: 0.03em;
+}
+.spool-item .grams {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  color: var(--ink);
+  text-align: right;
+  white-space: nowrap;
+}
+.spool-item .mod-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--run-soft);
+  color: var(--run);
+  white-space: nowrap;
+}
+.spool-item .mod-chip.empty {
+  background: var(--paper-inset);
+  color: var(--ink-3);
+}
+
+/* loadout — module rows with an inline spool picker */
+.loadout-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.loadout-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.loadout-row .mod-id {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-base);
+  min-width: 44px;
+}
+.loadout-row .loaded {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.loadout-row .loaded .nm {
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.loadout-select {
+  background: var(--paper-inset);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 7px 9px;
+  font-size: var(--t-xs);
+  font-family: var(--font-mono);
+  min-width: 130px;
+}
+
+/* =====================================================================
    Shared: errors, empties, skeletons
    ===================================================================== */
 

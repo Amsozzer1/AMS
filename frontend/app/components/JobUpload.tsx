@@ -1,26 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  listPrinters,
-  submitJob,
-  type JobResult,
-  type PrinterState,
-} from "@/lib/api";
+import { listPrinters, submitJob, type PrinterState } from "@/lib/api";
 
-// Pick a printer + a sliced .gcode.3mf (drag/drop or browse), POST it, and
-// render the returned ordered swap plan. "Arm only" calls ?start=false so the
-// plan is staged but the operator starts the print themselves (Bambu Studio).
-// A bad/sliceless file surfaces the server's 400 detail message.
-export default function JobUpload() {
+// Pick a printer + a sliced .gcode.3mf (drag/drop or browse) and ARM it
+// (?start=false). Arming stages the plan and computes the colour→module proposal
+// WITHOUT starting the print — the operator then maps colours and confirms in the
+// Filament mapping panel ("Confirm & Start"). This is step one of the two-step
+// flow: pick file → Upload & Arm → map → Confirm & Start. A bad/sliceless file
+// surfaces the server's 400 detail message.
+export default function JobUpload({
+  onArmed,
+}: {
+  onArmed: (printerId: string) => void;
+}) {
   const [printers, setPrinters] = useState<PrinterState[]>([]);
   const [printerId, setPrinterId] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
-  const [armOnly, setArmOnly] = useState(false);
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<JobResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Populate the printer picker once on mount (cards handle live polling).
@@ -46,7 +45,6 @@ export default function JobUpload() {
 
   function pickFile(f: File | null | undefined) {
     if (!f) return;
-    setResult(null);
     if (!isSliced3mf(f)) {
       setFile(null);
       setError(`${f.name} isn't a sliced .gcode.3mf — that's the only format the Brain parses.`);
@@ -67,10 +65,10 @@ export default function JobUpload() {
     if (!printerId || !file) return;
     setBusy(true);
     setError(null);
-    setResult(null);
     try {
-      const res = await submitJob(printerId, file, !armOnly);
-      setResult(res);
+      // Arm only — never auto-start. The operator confirms the mapping to start.
+      await submitJob(printerId, file, false);
+      onArmed(printerId);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -155,47 +153,14 @@ export default function JobUpload() {
             type="submit"
             disabled={busy || !printerId || !file}
           >
-            {busy ? "Planning…" : armOnly ? "Arm plan" : "Plan & start print"}
+            {busy ? "Arming…" : "Upload & Arm"}
           </button>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={armOnly}
-              onChange={(e) => setArmOnly(e.target.checked)}
-            />
-            Arm only — I&apos;ll start the print
-          </label>
+          <span className="checkbox" style={{ cursor: "default" }}>
+            Arms the plan — map colours below, then Confirm &amp; Start.
+          </span>
         </div>
 
         {error && <div className="error">{error}</div>}
-
-        {result && (
-          <div className="swap-plan">
-            <div className="plan-head">
-              <span>
-                {result.filename} — <span className="ok-tag">{armOnly ? "armed" : "started"}</span>
-              </span>
-              <span>
-                {result.planned_swaps.length} swap
-                {result.planned_swaps.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            {result.planned_swaps.length === 0 ? (
-              <div className="empty">No material changes found in this job.</div>
-            ) : (
-              <div className="plan-list">
-                {result.planned_swaps.map((s) => (
-                  <div className="plan-step" key={s.seq}>
-                    <span className="step-seq">{s.seq}</span>
-                    <span className="arrow">→</span>
-                    <span className="step-fil">filament {s.filament_index}</span>
-                    <span className="step-tag">{s.tag}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </form>
     </section>
   );

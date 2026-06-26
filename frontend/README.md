@@ -54,7 +54,9 @@ cd ../server && AMSX_PORT=9001 uv run amsx
 
 The hero is the human-swap loop. To exercise it end to end with no printer:
 
-1. Upload a sliced `.gcode.3mf` in **Job intake** (this arms a plan).
+1. Upload a sliced `.gcode.3mf` in **Job intake** ("Upload & Arm" arms a plan,
+   `?start=false`), then in **Filament mapping** confirm the colour→module mapping
+   and press **Confirm & Start**.
 2. `POST /api/printers/{id}/sim/pause` — the orchestrator advances to the next
    swap and raises a human prompt.
 3. The **Action Console** lights up amber at the top of the page. Press & hold
@@ -84,10 +86,23 @@ Watch `GET /api/prompts` and `GET /api/printers/{id}/orchestrator` drive the UI.
   progress & remaining time, temps, fans, wifi, identity, loaded filament, any
   `hms` health messages) over the COMPLETE `raw` report as a recursive
   collapsible tree (`JsonTree`) so nothing the Brain knows is hidden.
-- **Job intake** — drag/drop or browse a sliced `.gcode.3mf`, POST to
-  `/api/printers/{id}/job`, render the ordered `planned_swaps`. **Arm only**
-  posts `?start=false` to stage the plan without starting the print (the operator
-  starts it from Bambu Studio). A bad file shows the server's 400 message.
+- **Job intake** — drag/drop or browse a sliced `.gcode.3mf` and **Upload &
+  Arm** (`POST /api/printers/{id}/job?start=false`). This stages the plan and
+  computes the colour→module proposal WITHOUT starting the print. A bad file
+  shows the server's 400 message.
+- **Filament mapping** (appears once a printer is armed) — the Bambu-Studio-style
+  editable panel. Loads `GET /api/printers/{id}/job/assignment` (one row per
+  print colour: a real **color swatch** from `color_hex`, material + grams, a
+  status badge `loaded ✓` / `gap ⚠`) and the printer's module ids from
+  `GET /api/printers/{id}/loadout`. Each row has a module `<select>`; **Confirm &
+  Start** POSTs the mapping (`POST …/job/assignment`) then starts the already-armed
+  job (`POST …/job/start`). Gap rows are called out in vermilion; you can still
+  start with gaps.
+- **Inventory & loadout** (secondary) — **Spool inventory** is a read-only list
+  from `GET /api/spools` (color swatch, name/material, remaining grams, loaded
+  module). **Module loadout** shows each printer's modules and the loaded spool
+  (`GET …/loadout`) with an inline picker to reassign one (`PUT …/loadout`). Both
+  degrade to a calm empty state when Spoolman is down or unconfigured.
 
 ## Design direction
 
