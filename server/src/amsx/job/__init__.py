@@ -35,17 +35,27 @@ same marker when it authors the change-gcode.
 
 from __future__ import annotations
 
+import json
 import re
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from amsx.types import PlannedSwap, PrinterId, SwapPlan
+from defusedxml.ElementTree import fromstring as _xml_fromstring  # XXE / billion-laughs safe
+
+from amsx.types import FilamentColor, PlannedSwap, PrinterId, SwapPlan
 
 __all__ = ["PLATE_GCODE_PATH", "Job", "JobParseError", "JobParser"]
 
 #: The member inside the .gcode.3mf zip that holds the gcode the printer runs.
 PLATE_GCODE_PATH = "Metadata/plate_1.gcode"
+
+# 3MF metadata paths for colour-plan enrichment (confirmed real file layout).
+CUSTOM_GCODE_PATH = "Metadata/custom_gcode_per_layer.xml"
+FILAMENT_SEQ_PATH = "Metadata/filament_sequence.json"
+SLICE_INFO_PATH = "Metadata/slice_info.config"
+
+_HEX_RE = re.compile(r"#?([0-9A-Fa-f]{6})")
 
 # Line-anchored matchers. Real gcode is huge and full of comments/whitespace, so we
 # anchor on the whole (stripped) line and ignore anything after a ``;`` comment.
@@ -61,6 +71,66 @@ _M1020_RE = re.compile(r"^M1020\s+S(\d+)\b")
 # layer_num IS reported correctly (confirmed live 2026-06-25: M400 U1 at line 133871 = layer 75,
 # and the printer reported layer 75 at the pause).
 _LAYER_RE = re.compile(r"^;\s*layer num/total_layer_count:\s*(\d+)")
+
+
+def _hex6(s: str | None) -> str | None:
+    """Extract and normalise a 6-hex colour string to UPPERCASE, or None."""
+    m = _HEX_RE.search(s or "")
+    return m.group(1).upper() if m else None
+
+
+def _slice_info_map(zf: zipfile.ZipFile) -> dict[int, tuple[str | None, str | None, float | None]]:
+    """Parse ``Metadata/slice_info.config`` -> ``{index: (material, color_hex, grams)}``.
+
+    Best-effort: any missing/malformed/hostile XML degrades to ``{}``.
+    """
+    try:
+        root = _xml_fromstring(zf.read(SLICE_INFO_PATH).decode("utf-8", "replace"))
+    except Exception:
+        return {}
+    out: dict[int, tuple[str | None, str | None, float | None]] = {}
+    for fil in root.iter("filament"):
+        try:
+            idx = int(fil.get("id", ""))
+        except ValueError:
+            continue
+        grams = fil.get("used_g")
+        out[idx] = (fil.get("type"), _hex6(fil.get("color")), float(grams) if grams else None)
+    return out
+
+
+def _changes(zf: zipfile.ZipFile) -> list[tuple[int, str | None]]:
+    """Parse ``Metadata/custom_gcode_per_layer.xml`` -> ordered ``[(extruder_index, color_hex)]``.
+
+    Only ``gcode="tool_change"`` entries are returned, in document order.
+    Best-effort: any missing/malformed/hostile XML degrades to ``[]``.
+    """
+    try:
+        root = _xml_fromstring(zf.read(CUSTOM_GCODE_PATH).decode("utf-8", "replace"))
+    except Exception:
+        return []
+    out: list[tuple[int, str | None]] = []
+    for layer in root.iter("layer"):
+        if layer.get("gcode") == "tool_change":
+            try:
+                out.append((int(layer.get("extruder", "")), _hex6(layer.get("color"))))
+            except ValueError:
+                continue
+    return out
+
+
+def _base_index(zf: zipfile.ZipFile) -> int | None:
+    """Return the first filament index from ``Metadata/filament_sequence.json``.
+
+    This is the base (starting) filament for the job. Best-effort: any missing/
+    malformed JSON degrades to ``None``.
+    """
+    try:
+        seq = json.loads(zf.read(FILAMENT_SEQ_PATH).decode("utf-8", "replace"))
+        plate = next(iter(seq.values()))
+        return int(plate["sequence"][0])
+    except (KeyError, ValueError, StopIteration, IndexError, TypeError):
+        return None
 
 
 class JobParseError(Exception):
@@ -159,6 +229,42 @@ class JobParser:
         return SwapPlan(swaps=swaps)
 
     def parse(self, job: Job) -> SwapPlan:
-        """Parse ``job``'s sliced 3MF into an ordered :class:`SwapPlan`."""
-        gcode = self._read_plate_gcode(job.file)
-        return self._plan_from_gcode(gcode, source=str(job.file))
+        """Parse ``job``'s sliced 3MF into an ordered :class:`SwapPlan`.
+
+        Opens the zip once to read the plate gcode (required) then the colour
+        metadata (best-effort: missing/hostile files degrade gracefully).
+        Colour fields are only populated when the tool_change count in
+        ``custom_gcode_per_layer.xml`` exactly matches the ``M400 U1`` pause
+        count — any mismatch leaves ``material``/``color_hex`` as ``None``.
+        """
+        path = Path(job.file)
+        gcode = self._read_plate_gcode(path)
+        plan = self._plan_from_gcode(gcode, source=str(path))
+        try:
+            with zipfile.ZipFile(path) as zf:
+                info = _slice_info_map(zf)
+                changes = _changes(zf)
+                base_idx = _base_index(zf)
+        except zipfile.BadZipFile:
+            return plan
+        # Bind colours to pauses by ORDERED POSITION; only if counts line up.
+        swaps = plan.swaps
+        if changes and len(changes) == len(swaps):
+            swaps = [
+                PlannedSwap(
+                    seq=s.seq,
+                    filament_index=idx,
+                    tag=s.tag,
+                    layer=s.layer,
+                    line=s.line,
+                    material=(info.get(idx) or (None, None, None))[0],
+                    color_hex=color or (info.get(idx) or (None, None, None))[1],
+                )
+                for s, (idx, color) in zip(swaps, changes, strict=True)
+            ]
+        base = None
+        if base_idx is not None and base_idx in info:
+            mat, col, grams = info[base_idx]
+            base = FilamentColor(base_idx, mat, col, grams)
+        colors = [FilamentColor(i, m, c, g) for i, (m, c, g) in info.items()]
+        return SwapPlan(swaps=swaps, base=base, colors=colors)

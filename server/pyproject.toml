@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings>=2.5",  # config/ loading
     "pyyaml>=6.0",             # config/ — ams.yaml
     "httpx>=0.27",             # inventory/ — Spoolman REST (later)
+    "defusedxml>=0.7",         # job/ — XXE/billion-laughs-safe XML parse of 3MF metadata
 ]
 
 [project.optional-dependencies]
@@ -55,4 +56,11 @@ addopts = "-ra"
 
 # ---- ty (type checker) ----
 [tool.ty]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.18",
+]
 # defaults are fine for now; src layout is auto-detected
