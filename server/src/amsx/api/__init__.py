@@ -17,12 +17,34 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from ..brain import Brain, build_brain
 from ..events import PauseEvent, SensorEvent
 from ..orchestration import Orchestrator
 from ..printer import Printer
-from ..types import PauseReason, Spool
+from ..types import PauseReason, Spool, SpoolSpec
+
+
+class SpoolCreate(BaseModel):
+    """Request body for POST /api/spools."""
+
+    material: str
+    color_hex: str | None = None
+    name: str | None = None
+    vendor: str | None = None
+    initial_g: float = 1000.0
+    module: str | None = None
+    location: str | None = None
+
+
+class SpoolUpdate(BaseModel):
+    """Request body for PATCH /api/spools/{spool_id}."""
+
+    remaining_g: float | None = None
+    location: str | None = None
+    archived: bool | None = None
+
 
 log = logging.getLogger("amsx.api")
 
@@ -258,6 +280,62 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             "module": s.module,
             "archived": s.archived,
         }
+
+    @app.get("/api/modules")
+    async def list_modules() -> list[dict[str, Any]]:
+        """All configured AMS modules (for the add-spool form module dropdown)."""
+        return [
+            {"id": mc.id, "cluster_id": mc.cluster_id, "filament_index": mc.filament_index}
+            for mc in _brain().config.modules
+        ]
+
+    @app.post("/api/spools")
+    async def create_spool(body: SpoolCreate) -> dict[str, Any]:
+        """Create a new spool in the inventory."""
+        spec = SpoolSpec(
+            material=body.material,
+            color_hex=body.color_hex,
+            name=body.name,
+            vendor=body.vendor,
+            initial_g=body.initial_g,
+            module=body.module,
+            location=body.location,
+        )
+        try:
+            spool = await _brain().store.create_spool(spec)
+        except Exception as exc:
+            log.exception("API: create_spool FAILED")
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return _spool_dict(spool)
+
+    @app.patch("/api/spools/{spool_id}")
+    async def update_spool(spool_id: str, body: SpoolUpdate) -> dict[str, Any]:
+        """Update weight, location, or archived status of a spool."""
+        try:
+            spool = await _brain().store.update_spool(
+                spool_id,
+                remaining_g=body.remaining_g,
+                location=body.location,
+                archived=body.archived,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"unknown spool {spool_id!r}") from exc
+        except Exception as exc:
+            log.exception("API: update_spool FAILED for %s", spool_id)
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return _spool_dict(spool)
+
+    @app.delete("/api/spools/{spool_id}")
+    async def delete_spool(spool_id: str) -> dict[str, Any]:
+        """Hard-delete a spool from the inventory."""
+        try:
+            await _brain().store.delete_spool(spool_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"unknown spool {spool_id!r}") from exc
+        except Exception as exc:
+            log.exception("API: delete_spool FAILED for %s", spool_id)
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return {"ok": True, "id": spool_id}
 
     @app.get("/api/spools")
     async def list_spools(include_archived: bool = False) -> list[dict[str, Any]]:
