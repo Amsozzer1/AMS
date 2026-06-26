@@ -195,3 +195,23 @@ def test_money_shot_two_color_loop_over_http():
             assert st["cursor"] == expected_cursor
         final = client.get("/api/printers/x1c-1/orchestrator").json()
         assert final["done"] is True and final["held"] is False
+
+
+def test_job_start_after_arm_starts_held_job():
+    """Two-step flow: arm (start=false) then POST /job/start pushes+starts without re-arming."""
+    with TestClient(create_app(_sim_brain())) as client:
+        files = {"file": ("t.gcode.3mf", _sliced_3mf(0, 1), "application/octet-stream")}
+        armed = client.post("/api/printers/x1c-1/job", params={"start": "false"}, files=files)
+        assert armed.status_code == 200 and armed.json()["started"] is False
+        started = client.post("/api/printers/x1c-1/job/start")
+        assert started.status_code == 200 and started.json()["started"] is True
+
+
+def test_job_start_without_arm_is_409():
+    with TestClient(create_app(_sim_brain())) as client:
+        assert client.post("/api/printers/x1c-1/job/start").status_code == 409
+
+
+def test_job_start_unknown_printer_404():
+    with TestClient(create_app(_sim_brain())) as client:
+        assert client.post("/api/printers/ghost/job/start").status_code == 404

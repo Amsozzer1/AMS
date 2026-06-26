@@ -135,6 +135,10 @@ class Brain:
         self.assignment: dict[PrinterId, dict[int, ProposedRow]] = {}
         # confirmed tracks which printers have had their job/assignment POST-confirmed.
         self.confirmed: set[PrinterId] = set()
+        # The sliced file each printer is currently armed with, so the operator can confirm the
+        # mapping and THEN start the held job (FTPS upload + start) without re-arming (which would
+        # wipe the confirmed assignment). Set by arm_job; consumed by start_armed.
+        self._armed_files: dict[PrinterId, str] = {}
 
         self._module_by_id: dict[ModuleId, Module] = {}
         self._printer_buses: dict[PrinterId, MqttBus] = {}
@@ -307,8 +311,25 @@ class Brain:
         except Exception:
             log.warning("resolver.propose failed for %s (soft)", printer_id, exc_info=True)
             self.assignment.setdefault(printer_id, {})
+        # Remember the file so start_armed can push+start it after the operator confirms.
+        self._armed_files[printer_id] = str(file)
         log.info("job armed on %s: %d planned swap(s)", printer_id, len(plan))
         return orch
+
+    async def start_armed(self, printer_id: PrinterId) -> None:
+        """Push (FTPS) + start the job this printer is ALREADY armed with — no re-arm.
+
+        Lets the operator confirm the colour→module mapping first, then start, without
+        re-parsing/re-proposing (which would wipe the confirmed assignment). Raises KeyError if
+        nothing is armed for the printer.
+        """
+        file = self._armed_files.get(printer_id)
+        if file is None:
+            raise KeyError(f"no armed job for printer {printer_id!r} — upload (arm) one first")
+        printer = self.printers[printer_id]
+        path = await printer.send_job(file)
+        await printer.start_print(path)
+        log.info("armed job started on %s", printer_id)
 
     async def submit_job(self, printer_id: PrinterId, file: str | Path) -> Orchestrator:
         """Arm the plan, then push the sliced 3MF (FTPS) and start the print over MQTT.

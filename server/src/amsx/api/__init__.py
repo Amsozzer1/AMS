@@ -200,6 +200,27 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             ],
         }
 
+    @app.post("/api/printers/{printer_id}/job/start")
+    async def start_armed_job(printer_id: str) -> dict[str, Any]:
+        """Push (FTPS) + start the job this printer is ALREADY armed with.
+
+        The two-step flow: upload with ``?start=false`` to arm + propose the mapping, let the
+        operator confirm it (POST ``/job/assignment``), then call this to start the held job
+        WITHOUT re-arming (which would wipe the confirmed assignment). 409 if nothing is armed.
+        """
+        b = _brain()
+        if printer_id not in b.printers:
+            raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        try:
+            await b.start_armed(printer_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except Exception as exc:  # FTPS/start transport errors -> 400 for the UI
+            log.exception("API: start_armed FAILED for %s", printer_id)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        log.info("API: armed job started for %s", printer_id)
+        return {"printer_id": printer_id, "started": True}
+
     @app.get("/api/prompts")
     async def list_prompts() -> list[dict[str, Any]]:
         """Pending human-swap actions the orchestrator is waiting on."""
