@@ -90,6 +90,7 @@ class PlannedSwap:
     filament_index: int
     tag: str
     layer: int | None = None
+    line: int | None = None  # gcode line of this swap's M400 U1 (the #17 ordinal+line guard)
 
 
 @dataclass(frozen=True)

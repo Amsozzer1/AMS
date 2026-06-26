@@ -98,6 +98,7 @@ class PromptBroker:
         pending = self._pending.get(prompt_id)
         if pending is None:
             return False
+        log.info("PROMPT %s answered (module %s): %s", prompt_id, pending.module_id, response)
         if not pending.future.done():
             pending.future.set_result(response)
         return True
@@ -189,8 +190,13 @@ class Brain:
             self.printers[pc.id] = printer
 
     # ---- the front-end entry point ----
-    async def submit_job(self, printer_id: PrinterId, file: str | Path) -> Orchestrator:
-        """Parse a sliced 3MF, push + start it, and arm the orchestrator for the swaps."""
+    async def arm_job(self, printer_id: PrinterId, file: str | Path) -> Orchestrator:
+        """Parse a sliced 3MF and arm the orchestrator for the swaps — WITHOUT pushing/starting.
+
+        This is the FTPS-free path: the operator starts the print themselves (Bambu Studio / SD)
+        while the Brain owns the swap loop from the pause onward. ``submit_job`` is this plus the
+        (still hardware-unverified) FTPS push + start-print.
+        """
         printer = self.printers.get(printer_id)
         if printer is None:
             raise KeyError(f"unknown printer {printer_id!r}")
@@ -198,13 +204,29 @@ class Brain:
             raise RuntimeError("Brain not started")
 
         plan = JobParser().parse(Job(file=file, printer_id=printer_id))
+        # Re-arming a printer: detach the previous orchestrator from the bus FIRST, or it keeps
+        # hearing pauses and the swap runs twice (duplicate prompts — observed live 2026-06-25).
+        previous = self.orchestrators.pop(printer_id, None)
+        if previous is not None:
+            previous.unsubscribe()
+            log.info("re-arming %s: detached previous orchestrator", printer_id)
         orch = Orchestrator(printer, plan, self.registry, self.events, printer_id=printer_id)
         orch.subscribe()
         self.orchestrators[printer_id] = orch
+        log.info("job armed on %s: %d planned swap(s)", printer_id, len(plan))
+        return orch
 
+    async def submit_job(self, printer_id: PrinterId, file: str | Path) -> Orchestrator:
+        """Arm the plan, then push the sliced 3MF (FTPS) and start the print over MQTT.
+
+        The push/start half is the v0.4 hardware-unverified path; use ``arm_job`` to drive the
+        swap loop against an externally-started print.
+        """
+        orch = await self.arm_job(printer_id, file)
+        printer = self.printers[printer_id]
         path = await printer.send_job(str(file))
         await printer.start_print(path)
-        log.info("job submitted to %s: %d planned swap(s)", printer_id, len(plan))
+        log.info("job submitted + started on %s", printer_id)
         return orch
 
 

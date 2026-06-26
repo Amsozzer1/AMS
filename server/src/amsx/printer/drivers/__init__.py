@@ -17,7 +17,6 @@ from typing import Protocol, runtime_checkable
 
 from ...transport import Report
 from ...types import PauseReason
-from ...utils import todo
 
 
 @runtime_checkable
@@ -155,9 +154,15 @@ class A1Driver:
     READ path: confirmed live against an A1 mini on 2026-06-24 — the report nests state under
     ``print``; the toolhead filament-present switch is ``hw_switch_state`` (1 = present).
 
-    WRITE path (unload / extrude / confirm-resume / start-print): still DEFERRED. The A1 /
-    AMS-Lite feed path and change-routine differ from X1/P1 (docs/10 'Deferred / open' #10/#11);
-    those payloads come after the change routine is proven on hardware. They raise until then.
+    WRITE path: ``unload_filament`` and ``resume`` are CONFIRMED live against the A1 mini on
+    2026-06-25 (Bambu auto-heats the nozzle for the unload itself — we send the verb, never a
+    temperature). ``request_start_print`` is still a CANDIDATE payload (v0.4 item), and
+    ``request_extrude`` (raw ``M83``/``G1 E45``) is a clearly-labelled diagnostic fallback only.
+
+    The envelope is the standard Bambu command form: a ``print`` object with a ``command`` and a
+    monotonic ``sequence_id`` the printer echoes in its ack. Option A = ride Bambu's OWN routine
+    (``unload_filament`` / ``resume``); ``request_extrude`` is the raw load gcode for when the
+    closed sensor loop wants an explicit push.
     """
 
     model = "A1"
@@ -166,17 +171,93 @@ class A1Driver:
     # Confirmed live (A1 mini, 2026-06-24): toolhead filament-present switch.
     _SENSOR_FIELD = "hw_switch_state"
 
-    @todo("A1 feed path differs; build after X1/P1 is proven (PHASE-0, docs/10 #10/#11)")
-    def request_unload(self) -> Report: ...
+    def __init__(self) -> None:
+        self._seq = 0
 
-    @todo("PHASE-0, docs/10 #10/#11")
-    def request_extrude(self) -> Report: ...
+    def _next_seq(self) -> str:
+        self._seq += 1
+        return str(self._seq)
 
-    @todo("PHASE-0, docs/10 #10/#11")
-    def request_confirm_resume(self) -> Report: ...
+    def _gcode(self, *lines: str) -> Report:
+        """A ``gcode_line`` command carrying one or more raw gcode lines (newline-terminated)."""
+        return {
+            "print": {
+                "sequence_id": self._next_seq(),
+                "command": "gcode_line",
+                "param": "".join(f"{ln}\n" for ln in lines),
+            }
+        }
 
-    @todo("PHASE-0, docs/10 #10/#11")
-    def request_start_print(self, remote_path: str) -> Report: ...
+    def request_unload(self) -> Report:
+        """Ride Bambu's own unload routine (Option A) — CONFIRMED live A1 mini 2026-06-25.
+
+        ``unload_filament`` is the confirmed command verb: the A1 mini honours it on an
+        external-spool change and Bambu auto-heats the nozzle for the retract itself (we send
+        only the verb — never a temperature or distance). No raw ``G1 E-100`` retract needed.
+        """
+        return {"print": {"sequence_id": self._next_seq(), "command": "unload_filament"}}
+
+    def request_extrude(self) -> Report:
+        """Load/grab the new filament toward the nozzle (raw gcode) — DIAGNOSTIC FALLBACK ONLY.
+
+        PHASE-0: verify — this is NOT part of the confirmed Option-A loop. ``M83`` (relative
+        extrusion) then ``G1 E45 F500`` (grab-and-feed value from the A1 manual-change gcode).
+        ``M83`` matters: a bare ``G1 E45`` in the default absolute mode targets E-coordinate 45
+        rather than pushing 45mm. Requires a HOT nozzle — firmware blocks cold extrusion. The
+        confirmed v0 loop closes on the printer sensor + ``resume`` (Bambu loads/purges itself),
+        so this raw push is the diagnostic fallback for when that closed loop wants an explicit
+        nudge — keep it labelled and unverified.
+        """
+        return self._gcode("M83", "G1 E45 F500")
+
+    def request_confirm_resume(self) -> Report:
+        """Resume the paused print (the load-bearing gate) — CONFIRMED live A1 mini 2026-06-25.
+
+        ``resume`` is the confirmed verb: after an external-spool change it lifts the pause and
+        the print continues (this is the load-bearing gate from docs/09 — if it were wrong the
+        print would sit paused forever; it does not).
+        """
+        return {"print": {"sequence_id": self._next_seq(), "command": "resume", "param": ""}}
+
+    def request_start_print(self, remote_path: str) -> Report:
+        """Build the 'start printing the FTPS-uploaded file' command (Bambu ``project_file``).
+
+        ``remote_path`` is what ``FtpsClient.upload`` returns — ``/cache/<name>``. The A1 reads
+        the print file off its **SD card**, addressed as ``file:///sdcard/cache/<name>`` — i.e.
+        FTP's ``/cache`` IS the card's ``/sdcard/cache``. Sending ``ftp:///cache/<name>`` instead
+        made the A1 mini fault with the MicroSD read/write exception (0500_C010) the instant the
+        print started — the firmware couldn't resolve that to a card read (confirmed live
+        2026-06-25; ground-truth ``print_error`` from the report). ``param`` is the plate gcode
+        inside the .3mf zip; ``use_ams`` is false (external spool, no AMS).
+
+        PHASE-0 (v0.4): the ``file:///sdcard/cache/`` url form matches the only confirmed-working
+        A1 project_file example; the cali/inspect toggles are sensible defaults, not gospel.
+        """
+        name = remote_path.rsplit("/", 1)[-1]
+        return {
+            "print": {
+                "sequence_id": self._next_seq(),
+                "command": "project_file",
+                "param": "Metadata/plate_1.gcode",  # plate gcode inside the .3mf zip
+                # FTP /cache == the card's /sdcard/cache; the A1 prints from the card, not ftp://.
+                "url": f"file:///sdcard{remote_path}",  # -> file:///sdcard/cache/<name>
+                "plate_idx": 0,
+                "subtask_name": name,
+                "project_id": "0",  # "0" across the ids = a local/LAN print (no cloud project)
+                "profile_id": "0",
+                "task_id": "0",
+                "subtask_id": "0",
+                "md5": "",
+                "timelapse": False,
+                "bed_type": "auto",
+                "bed_leveling": True,  # Bambu field spelling (American)
+                "flow_cali": False,
+                "vibration_cali": False,
+                "layer_inspect": False,
+                "ams_mapping": [],  # external spool — no AMS tray map (list, not "")
+                "use_ams": False,  # external spool — never the AMS
+            }
+        }
 
     def parse_pause_reason(self, report: Report) -> PauseReason:
         # PHASE-0: verify — how the A1 tags a filament-change pause vs a user pause. Until

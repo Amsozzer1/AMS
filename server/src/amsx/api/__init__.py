@@ -6,6 +6,8 @@ mode by default — no printer required — so `uv run amsx` starts and serves i
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 import tempfile
 from contextlib import asynccontextmanager
@@ -16,7 +18,12 @@ from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..brain import Brain, build_brain
+from ..events import PauseEvent, SensorEvent
+from ..orchestration import Orchestrator
 from ..printer import Printer
+from ..types import PauseReason
+
+log = logging.getLogger("amsx.api")
 
 # Local-first dev: the SPA is served from a different port, so allow the dev origins.
 # Override with AMSX_CORS_ORIGINS (comma-separated) when serving from elsewhere.
@@ -68,6 +75,29 @@ def _printer_detail(brain: Brain, printer: Printer) -> dict[str, Any]:
     }
 
 
+def _orchestrator_status(orch: Orchestrator) -> dict[str, Any]:
+    """The live swap loop's state — what the dashboard (and the v0 test script) watch."""
+    return {
+        "armed": True,
+        "printer_id": orch.printer_id,
+        "cursor": orch.cursor,
+        "total": len(orch.plan),
+        "done": orch.done,
+        "held": orch.held,
+        "swap_state": str(orch.sm.state),
+        "alerts": list(orch.alerts),
+        "swaps": [
+            {
+                "seq": sw.seq,
+                "filament_index": sw.filament_index,
+                "tag": sw.tag,
+                "current": i == orch.cursor,
+            }
+            for i, sw in enumerate(orch.plan.swaps)
+        ],
+    }
+
+
 def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
     """Build the app. Pass a pre-built `brain` (e.g. in tests); otherwise one is constructed
     from the resolved config on startup.
@@ -96,6 +126,9 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
 
     def _brain() -> Brain:
         return app.state.brain
+
+    # Strong refs to fire-and-forget swap tasks so the loop can't GC them mid-swap.
+    _bg_tasks: set[asyncio.Task] = set()
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -128,20 +161,38 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         return _printer_detail(b, printer)
 
     @app.post("/api/printers/{printer_id}/job")
-    async def submit_job(printer_id: str, file: UploadFile) -> dict[str, Any]:
+    async def submit_job(printer_id: str, file: UploadFile, start: bool = True) -> dict[str, Any]:
+        """Upload a sliced 3MF and arm the swap plan.
+
+        ``start=true`` (default) also pushes (FTPS) + starts the print — the still-unverified
+        v0.4 path. ``start=false`` ARMS ONLY: the operator starts the print themselves (Bambu
+        Studio / SD) and the Brain owns the swap loop from the pause onward (no FTPS needed).
+        """
         b = _brain()
         if printer_id not in b.printers:
             raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        log.info(
+            "API: job upload received — printer=%s file=%r start=%s",
+            printer_id,
+            file.filename,
+            start,
+        )
         with tempfile.NamedTemporaryFile(delete=False, suffix=".gcode.3mf") as tmp:
             tmp.write(await file.read())
             saved = Path(tmp.name)
         try:
-            orch = await b.submit_job(printer_id, saved)
+            run = b.submit_job(printer_id, saved) if start else b.arm_job(printer_id, saved)
+            orch = await run
         except Exception as exc:  # parse/transport errors -> 400 for the UI
+            # Log the FULL exception here — otherwise a failed upload/start is invisible on the
+            # server (it only became a UI 400), which looked exactly like "it just hangs".
+            log.exception("API: job submit FAILED for %s", printer_id)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        log.info("API: job accepted for %s (started=%s)", printer_id, start)
         return {
             "printer_id": printer_id,
             "filename": file.filename,
+            "started": start,
             "planned_swaps": [
                 {"seq": sw.seq, "filament_index": sw.filament_index, "tag": sw.tag}
                 for sw in orch.plan.swaps
@@ -158,5 +209,92 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         if not _brain().prompts.answer(prompt_id, response):
             raise HTTPException(status_code=404, detail=f"unknown prompt {prompt_id!r}")
         return {"ok": True, "prompt_id": prompt_id}
+
+    @app.get("/api/printers/{printer_id}/orchestrator")
+    async def get_orchestrator(printer_id: str) -> dict[str, Any]:
+        """The armed swap loop for this printer (cursor / held / swap_state / alerts).
+
+        404 if the printer is unknown; ``{"armed": false}`` if no job has been submitted yet.
+        """
+        b = _brain()
+        if printer_id not in b.printers:
+            raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        orch = b.orchestrators.get(printer_id)
+        if orch is None:
+            return {"armed": False, "printer_id": printer_id}
+        return _orchestrator_status(orch)
+
+    # ---- simulate-only test hooks --------------------------------------------------------
+    # These let a client drive the swap loop without a printer: inject the pause the
+    # orchestrator would see over MQTT and trip the printer's filament sensor. They are the
+    # missing seam between SimulatedPrinterLink and the HTTP API. Hard-gated on simulate so
+    # they can NEVER fire against real hardware.
+    def _require_sim(b: Brain) -> None:
+        if not b.simulate:
+            raise HTTPException(
+                status_code=409, detail="sim hooks are only available in simulate mode"
+            )
+
+    def _armed_orchestrator(b: Brain, printer_id: str) -> Orchestrator:
+        if printer_id not in b.printers:
+            raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
+        orch = b.orchestrators.get(printer_id)
+        if orch is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"no job armed for {printer_id!r} — POST a 3MF to /job first",
+            )
+        return orch
+
+    @app.post("/api/printers/{printer_id}/sim/pause")
+    async def sim_pause(
+        printer_id: str, tag: str | None = None, line: int | None = None
+    ) -> dict[str, Any]:
+        """Inject a filament-change pause (simulate mode only).
+
+        Default (no params): an UNTAGGED pause carrying the next expected swap's gcode ``line`` —
+        exactly what a real Bambu ``M400 U1`` looks like, so it exercises the #17 ordinal+line
+        guard the real loop uses. Pass ``?line=`` to force a different line (e.g. a far value to
+        hit the safe-hold path), or ``?tag=`` to inject a tagged pause (and force a tag mismatch).
+        Returns immediately; the swap then blocks on the human prompt — poll ``/api/prompts``.
+        """
+        b = _brain()
+        _require_sim(b)
+        orch = _armed_orchestrator(b, printer_id)
+        if tag is not None:
+            event = PauseEvent(printer_id=printer_id, reason=PauseReason.CHANGE, tag=tag)
+            injected: dict[str, Any] = {"tag": tag}
+        else:
+            if line is None:
+                if orch.done:
+                    raise HTTPException(
+                        status_code=409, detail="no remaining planned swap (plan complete)"
+                    )
+                line = orch.plan.swaps[orch.cursor].line
+            # reason=UNKNOWN mirrors the A1 (it doesn't classify the pause); the orchestrator
+            # binds it positionally and confirms with the line guard.
+            event = PauseEvent(
+                printer_id=printer_id, reason=PauseReason.UNKNOWN, tag=None, line=line
+            )
+            injected = {"line": line}
+        # Don't await: on_pause runs the whole swap, which blocks on the human prompt. Fire it
+        # onto the loop and return so the client can answer prompts + trip the sensor.
+        task = asyncio.create_task(b.events.publish(event))
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+        return {"injected": "pause", "printer_id": printer_id, **injected}
+
+    @app.post("/api/printers/{printer_id}/sim/sensor")
+    async def sim_sensor(printer_id: str, present: bool = True) -> dict[str, Any]:
+        """Trip (or clear) the printer's filament-present sensor (simulate mode only).
+
+        Publishes a ``SensorEvent`` — the signal that closes the orchestrator's SENSING loop.
+        Call this once the swap has reached SENSING (after answering the feed prompt).
+        """
+        b = _brain()
+        _require_sim(b)
+        _armed_orchestrator(b, printer_id)
+        await b.events.publish(SensorEvent(printer_id=printer_id, filament_present=present))
+        return {"injected": "sensor", "printer_id": printer_id, "filament_present": present}
 
     return app

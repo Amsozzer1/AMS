@@ -17,7 +17,7 @@ import pytest
 
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
 from amsx.printer import Printer, PrinterState
-from amsx.printer.drivers import X1P1Driver
+from amsx.printer.drivers import A1Driver, X1P1Driver
 from amsx.protocols import PrinterControl
 from amsx.transport import SimulatedFtpClient, SimulatedPrinterLink
 from amsx.types import FilamentRef, PauseReason, PrinterStage
@@ -195,6 +195,67 @@ async def test_send_job_and_start_print() -> None:
     base = len(link.sent)
     await printer.start_print(remote)
     assert len(link.sent) == base + 1
+
+
+async def test_line_number_parsed_into_progress() -> None:
+    """``mc_print_line_number`` (a STRING int) is parsed into progress["line"] (delta-safe)."""
+    printer, link, _bus, _rec = _make_printer()
+    await printer.connect()
+    await link.feed_report(_full_report(stage="RUNNING", sensor=True))
+
+    # The printer reports the gcode line as a string int.
+    await link.feed_report({"print": {"mc_print_line_number": "1234"}})
+    assert printer.state.progress["line"] == 1234  # parsed to int
+
+    # A delta that doesn't mention the line must leave the cached value untouched.
+    await link.feed_report({"print": {"layer_num": 9}})
+    assert printer.state.progress["line"] == 1234
+
+
+async def test_pause_event_carries_line_number() -> None:
+    """A pause surfaces the reported gcode line on ``PauseEvent.line`` (open question #17)."""
+    printer, link, _bus, rec = _make_printer()
+    await printer.connect()
+    await link.feed_report(_full_report(stage="RUNNING", sensor=True))
+
+    # Report a line, then transition into PAUSED in the same flow.
+    await link.feed_report({"print": {"mc_print_line_number": "4096"}})
+    await link.feed_report({"print": {"gcode_state": "PAUSE"}})
+
+    assert len(rec.pauses) == 1
+    assert rec.pauses[0].line == 4096
+    assert rec.pauses[0].layer == 0  # layer still surfaced alongside
+
+
+async def test_a1_request_start_print_shape() -> None:
+    """A1Driver.request_start_print builds the Bambu ``project_file`` payload (candidate shape)."""
+    driver = A1Driver()
+    payload = driver.request_start_print("/cache/two_color.gcode.3mf")
+    pr = payload["print"]
+    assert pr["command"] == "project_file"
+    assert pr["param"] == "Metadata/plate_1.gcode"
+    # The A1 prints off its SD card: FTP /cache == the card's /sdcard/cache. Sending ftp:///cache
+    # instead faulted the A1 mini with the MicroSD read/write exception (confirmed live 2026-06-25).
+    assert pr["url"] == "file:///sdcard/cache/two_color.gcode.3mf"
+    assert pr["plate_idx"] == 0
+    assert pr["subtask_name"] == "two_color.gcode.3mf"
+    # Local/LAN print: ids are "0" and AMS is off.
+    assert pr["project_id"] == "0"
+    assert pr["use_ams"] is False
+    assert pr["ams_mapping"] == []
+    # sequence_id is the monotonic echo handle.
+    assert isinstance(pr["sequence_id"], str)
+
+
+async def test_a1_confirmed_write_verbs() -> None:
+    """The confirmed Option-A verbs (unload/resume) carry a sequence_id and the right command."""
+    driver = A1Driver()
+    unload = driver.request_unload()["print"]
+    resume = driver.request_confirm_resume()["print"]
+    assert unload["command"] == "unload_filament"
+    assert resume["command"] == "resume"
+    # Monotonic sequence_id across calls.
+    assert unload["sequence_id"] != resume["sequence_id"]
 
 
 async def test_state_defaults() -> None:

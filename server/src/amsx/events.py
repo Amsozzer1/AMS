@@ -18,12 +18,19 @@ from .types import ModuleId, ModuleState, PauseReason, PrinterId
 # ---- event payloads ----
 @dataclass(frozen=True)
 class PauseEvent:
-    """Printer reported a pause. `reason`/`tag` feed the orchestrator's plan validation."""
+    """Printer reported a pause. `reason`/`tag`/`line` feed the orchestrator's plan validation.
+
+    `line` is the printer's reported gcode line (`mc_print_line_number`) at the pause — the
+    unique, monotonic position that lets the orchestrator confirm an untagged Bambu `M400 U1`
+    pause is genuinely the cursor-th planned change (open question #17). `layer` is the coarser
+    fallback (breaks when a layer has multiple changes).
+    """
 
     printer_id: PrinterId
     reason: PauseReason = PauseReason.UNKNOWN
     tag: str | None = None
     layer: int | None = None
+    line: int | None = None
 
 
 @dataclass(frozen=True)
@@ -68,7 +75,18 @@ class EventBus:
     def subscribe(self, event_type: type, handler: Handler) -> None:
         self._handlers[event_type].append(handler)
 
+    def unsubscribe(self, event_type: type, handler: Handler) -> None:
+        """Remove a previously-subscribed handler (idempotent — a no-op if not present).
+
+        Needed so re-arming a printer can tear down its old Orchestrator's subscription; otherwise
+        a stale orchestrator keeps hearing pauses and the swap runs twice.
+        """
+        handlers = self._handlers.get(event_type)
+        if handlers and handler in handlers:
+            handlers.remove(handler)
+
     async def publish(self, event: Event) -> None:
-        handlers = self._handlers.get(type(event), [])
+        # Snapshot so a handler that (un)subscribes mid-dispatch can't mutate what we're iterating.
+        handlers = list(self._handlers.get(type(event), []))
         if handlers:
             await asyncio.gather(*(h(event) for h in handlers))

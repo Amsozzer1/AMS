@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import time
 import zipfile
 
 from fastapi.testclient import TestClient
@@ -92,3 +93,105 @@ def test_answer_unknown_prompt_404():
     with TestClient(create_app(_sim_brain())) as client:
         assert client.post("/api/prompts/nope/answer").status_code == 404
         assert client.get("/api/prompts").json() == []
+
+
+# --- orchestrator status + simulate-only swap-loop hooks -------------------------------------
+def _submit(client: TestClient, *changes: int):
+    files = {"file": ("t.gcode.3mf", _sliced_3mf(*changes), "application/octet-stream")}
+    resp = client.post("/api/printers/x1c-1/job", files=files)
+    assert resp.status_code == 200, resp.text
+    return resp
+
+
+def _drive_until(client: TestClient, target_cursor: int, *, budget: int = 400) -> dict:
+    """Answer every pending human prompt and trip the sensor in SENSING until the cursor
+    reaches ``target_cursor`` (or the loop safe-holds). Mirrors scripts/test_v0_api.py."""
+    for _ in range(budget):
+        for p in client.get("/api/prompts").json():
+            client.post(f"/api/prompts/{p['id']}/answer")
+        st = client.get("/api/printers/x1c-1/orchestrator").json()
+        if st.get("swap_state") == "SENSING":
+            client.post("/api/printers/x1c-1/sim/sensor", params={"present": True})
+        if st.get("cursor") == target_cursor or st.get("held"):
+            return st
+        time.sleep(0.01)
+    return client.get("/api/printers/x1c-1/orchestrator").json()
+
+
+def test_arm_only_does_not_start():
+    with TestClient(create_app(_sim_brain())) as client:
+        files = {"file": ("t.gcode.3mf", _sliced_3mf(0, 1), "application/octet-stream")}
+        resp = client.post("/api/printers/x1c-1/job", params={"start": "false"}, files=files)
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["started"] is False
+        # The plan is armed even though the print was not started (FTPS-free path).
+        st = client.get("/api/printers/x1c-1/orchestrator").json()
+        assert st["armed"] is True and st["total"] == 2 and st["cursor"] == 0
+
+
+def test_orchestrator_unarmed_then_armed():
+    with TestClient(create_app(_sim_brain())) as client:
+        assert client.get("/api/printers/nope/orchestrator").status_code == 404
+        assert client.get("/api/printers/x1c-1/orchestrator").json() == {
+            "armed": False,
+            "printer_id": "x1c-1",
+        }
+        _submit(client, 0, 1)
+        st = client.get("/api/printers/x1c-1/orchestrator").json()
+        assert st["armed"] is True
+        assert st["cursor"] == 0 and st["total"] == 2 and st["done"] is False
+        assert [s["filament_index"] for s in st["swaps"]] == [0, 1]
+
+
+def test_sim_hooks_require_armed_job():
+    with TestClient(create_app(_sim_brain())) as client:
+        # No job yet -> 409 (nothing to pause).
+        assert client.post("/api/printers/x1c-1/sim/pause").status_code == 409
+        assert client.post("/api/printers/ghost/sim/pause").status_code == 404
+
+
+def test_sim_hooks_blocked_when_not_simulating():
+    # Start in simulate mode (no real connection), then flip the live brain to non-simulate:
+    # the hooks must refuse even with a job armed.
+    with TestClient(create_app(_sim_brain())) as client:
+        _submit(client, 0)
+        client.app.state.brain.simulate = False
+        assert client.post("/api/printers/x1c-1/sim/pause").status_code == 409
+        assert client.post("/api/printers/x1c-1/sim/sensor").status_code == 409
+
+
+def test_mismatched_tag_pause_safe_holds():
+    with TestClient(create_app(_sim_brain())) as client:
+        _submit(client, 0, 1)
+        resp = client.post("/api/printers/x1c-1/sim/pause", params={"tag": "WRONG-TAG"})
+        assert resp.status_code == 200
+        st = _drive_until(client, target_cursor=99)  # never reached; we expect a hold
+        assert st["held"] is True
+        assert st["cursor"] == 0
+        assert any("does not match" in a for a in st["alerts"])
+
+
+def test_far_line_pause_safe_holds():
+    # An untagged pause whose reported line is nowhere near a planned swap = stray → safe-hold.
+    with TestClient(create_app(_sim_brain())) as client:
+        _submit(client, 0, 1)
+        resp = client.post("/api/printers/x1c-1/sim/pause", params={"line": 999999})
+        assert resp.status_code == 200 and resp.json()["line"] == 999999
+        st = _drive_until(client, target_cursor=99, budget=120)
+        assert st["held"] is True and st["cursor"] == 0
+
+
+def test_money_shot_two_color_loop_over_http():
+    """The v0 money shot, end to end over HTTP in simulate mode: submit -> pause -> human
+    prompt -> sensor trip -> resume -> cursor advances, for both color changes."""
+    with TestClient(create_app(_sim_brain())) as client:
+        _submit(client, 0, 1)
+        for expected_cursor in (1, 2):
+            pause = client.post("/api/printers/x1c-1/sim/pause")
+            assert pause.status_code == 200, pause.text
+            st = _drive_until(client, target_cursor=expected_cursor)
+            assert st["held"] is False, st["alerts"]
+            assert st["cursor"] == expected_cursor
+        final = client.get("/api/printers/x1c-1/orchestrator").json()
+        assert final["done"] is True and final["held"] is False

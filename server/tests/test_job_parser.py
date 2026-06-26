@@ -56,6 +56,52 @@ def test_tags_are_deterministic_and_seq_based(sliced_3mf: Path) -> None:
     assert [s.tag for s in plan.swaps] == ["swap-001", "swap-002", "swap-003"]
 
 
+def test_records_gcode_line_of_each_pause(tmp_path: Path) -> None:
+    # Each M400 U1's 1-based RAW line index is recorded (the #17 ordinal+line guard).
+    gcode = (
+        "G28\n"  # line 1
+        "M1020 S1\n"  # line 2
+        "M400 U1\n"  # line 3  -> swap 1
+        "G1 X1 Y1\n"  # line 4
+        "M1020 S2\n"  # line 5
+        ";comment\n"  # line 6 (counted — matches the printer's own line counter)
+        "M400 U1\n"  # line 7  -> swap 2
+    )
+    path = _make_3mf(tmp_path, plate_gcode=gcode)
+    plan = JobParser().parse(Job(file=path, printer_id="p1"))
+    assert [s.line for s in plan.swaps] == [3, 7]
+
+
+def test_records_layer_of_each_pause(tmp_path: Path) -> None:
+    # The Bambu layer marker is a COMMENT; each pause records the layer in effect above it. The A1
+    # reports line 0 at the pause, so layer is the binding the orchestrator uses (confirmed live).
+    gcode = (
+        "; layer num/total_layer_count: 1/250\n"
+        "G28\n"
+        "M1020 S1\n"
+        "M400 U1\n"  # swap 1 @ layer 1
+        "; layer num/total_layer_count: 75/250\n"
+        "M1020 S2\n"
+        "M400 U1\n"  # swap 2 @ layer 75
+        "; layer num/total_layer_count: 75/250\n"  # second change ON THE SAME layer
+        "M1020 S3\n"
+        "M400 U1\n"  # swap 3 @ layer 75
+    )
+    path = _make_3mf(tmp_path, plate_gcode=gcode)
+    plan = JobParser().parse(Job(file=path, printer_id="p1"))
+    assert [s.layer for s in plan.swaps] == [1, 75, 75]
+
+
+def test_layer_is_none_without_markers(tmp_path: Path) -> None:
+    # No layer markers (e.g. a hand-written gcode) -> layer stays None; the orchestrator then
+    # falls back to the line guard. Line is still recorded.
+    gcode = "M1020 S1\nM400 U1\n"
+    path = _make_3mf(tmp_path, plate_gcode=gcode)
+    plan = JobParser().parse(Job(file=path, printer_id="p1"))
+    assert plan.swaps[0].layer is None
+    assert plan.swaps[0].line == 2
+
+
 def test_bare_m400_without_u1_is_not_a_change(tmp_path: Path) -> None:
     gcode = "M1020 S3\nM400\nG1 X1 Y1\n"  # bare M400 = not a swap, and no U1 pause at all
     path = _make_3mf(tmp_path, plate_gcode=gcode)
@@ -96,7 +142,10 @@ def test_error_when_no_changes(tmp_path: Path) -> None:
         JobParser().parse(Job(file=path, printer_id="p1"))
 
 
-def test_error_on_pause_with_no_governing_m1020(tmp_path: Path) -> None:
+def test_pause_with_no_m1020_defaults_to_slot_0(tmp_path: Path) -> None:
+    # Manual external-spool change ("Add pause" / No-AMS preset) emits a bare M400 U1 with no
+    # M1020. The single external spool is always slot 0, so we default to 0 instead of raising.
     path = _make_3mf(tmp_path, plate_gcode="G28\nM400 U1\nG1 X1 Y1\n")
-    with pytest.raises(JobParseError, match="no preceding"):
-        JobParser().parse(Job(file=path, printer_id="p1"))
+    plan = JobParser().parse(Job(file=path, printer_id="p1"))
+    assert len(plan) == 1
+    assert plan.swaps[0].filament_index == 0

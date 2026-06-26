@@ -33,10 +33,11 @@ PRINTER_ID = "x1c-1"
 
 
 def _plan() -> SwapPlan:
+    # `line` is the gcode line of each swap's M400 U1 — the #17 line guard for untagged pauses.
     return SwapPlan(
         swaps=[
-            PlannedSwap(seq=0, filament_index=1, tag="AMSX-SWAP-0"),
-            PlannedSwap(seq=1, filament_index=2, tag="AMSX-SWAP-1"),
+            PlannedSwap(seq=0, filament_index=1, tag="AMSX-SWAP-0", line=1000),
+            PlannedSwap(seq=1, filament_index=2, tag="AMSX-SWAP-1", line=5000),
         ]
     )
 
@@ -128,17 +129,17 @@ async def test_sensor_event_can_close_the_loop():
 # ---------------------------------------------------------------------------------------------
 # Untagged / stray pause: exception, no swap.
 # ---------------------------------------------------------------------------------------------
-async def test_untagged_pause_holds_and_does_not_swap():
+async def test_untagged_user_pause_holds_and_does_not_swap():
     printer = FakePrinter(trip_after_polls=1)
     orch = _make_orchestrator(printer)
 
-    # A user hits pause on the printer: no tag.
+    # A user hits pause on the printer: no tag, explicit USER reason → never our swap.
     await orch.bus.publish(PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.USER, tag=None))
 
     assert orch.cursor == 0  # never advanced
     assert orch.held is True
     assert orch.alerts  # an alert was raised
-    assert "untagged" in orch.alerts[-1]
+    assert "user pause" in orch.alerts[-1]
     # No routine ran — we never touched the printer's change sequence.
     assert printer.calls == []
 
@@ -155,6 +156,197 @@ async def test_mismatched_tag_pause_holds_and_does_not_swap():
     assert orch.held is True
     assert "does not match" in orch.alerts[-1]
     assert printer.calls == []
+
+
+# ---------------------------------------------------------------------------------------------
+# Untagged REAL Bambu pause (open question #17): bound by ordinal cursor + line guard.
+# ---------------------------------------------------------------------------------------------
+async def test_untagged_pause_with_matching_line_swaps_and_advances():
+    """A real Bambu M400 U1 pause: no tag, reason UNKNOWN, line matching plan.swaps[0].line."""
+    printer = FakePrinter(trip_after_polls=1)
+    orch = _make_orchestrator(printer)
+
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, line=1000)
+    )
+
+    assert orch.cursor == 1
+    assert orch.held is False
+    assert orch.sm.state is SwapState.WATCHING
+    assert "routine_unload" in printer.calls
+    assert "routine_confirm_resume" in printer.calls
+
+
+async def test_untagged_pause_with_near_line_within_tolerance_swaps():
+    """The printer's reported line may be a little off the exact M400 U1 line — still ours."""
+    printer = FakePrinter(trip_after_polls=1)
+    orch = _make_orchestrator(printer)
+
+    # expected.line=1000, tolerance ±50 → 1037 is in-window.
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, line=1037)
+    )
+
+    assert orch.cursor == 1
+    assert orch.held is False
+
+
+async def test_untagged_pause_with_far_line_holds():
+    """A line far from any expected swap → the guard rejects it (safe-hold, no swap)."""
+    printer = FakePrinter(trip_after_polls=1)
+    orch = _make_orchestrator(printer)
+
+    # 3000 is between swap 0 (1000) and swap 1 (5000), far from both → out of range.
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, line=3000)
+    )
+
+    assert orch.cursor == 0
+    assert orch.held is True
+    assert "out of range" in orch.alerts[-1]
+    assert "3000" in orch.alerts[-1]
+    assert printer.calls == []
+
+
+async def test_untagged_pause_without_line_accepted_unguarded():
+    """Line info absent → degrade to pure ordinal: accept + advance, but flag UNGUARDED."""
+    printer = FakePrinter(trip_after_polls=1)
+    orch = _make_orchestrator(printer)
+
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, line=None)
+    )
+
+    assert orch.cursor == 1  # advanced ordinally
+    assert orch.held is False  # accepting unguarded does NOT hold the loop
+    assert orch.alerts  # but an alert was raised
+    assert "UNGUARDED" in orch.alerts[-1]
+    assert "routine_confirm_resume" in printer.calls
+
+
+async def test_multiple_changes_same_layer_disambiguated_by_line():
+    """Two changes on one layer: same `layer`, distinct lines. Two untagged pauses at those
+    lines advance the cursor twice — line is the guard, the cursor is the sequencer.
+    """
+    plan = SwapPlan(
+        swaps=[
+            PlannedSwap(seq=0, filament_index=1, tag="t0", layer=42, line=2000),
+            PlannedSwap(seq=1, filament_index=2, tag="t1", layer=42, line=2080),
+        ]
+    )
+    printer = FakePrinter(trip_after_polls=1)
+    orch = Orchestrator(
+        printer,
+        plan,
+        _registry(),
+        EventBus(),
+        printer_id=PRINTER_ID,
+        sense_timeout_s=2.0,
+        sense_poll_s=0.01,
+    )
+    orch.subscribe()
+
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, line=2000)
+    )
+    assert orch.cursor == 1
+    assert not orch.held
+
+    printer.reset_sensor()
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, line=2080)
+    )
+    assert orch.cursor == 2
+    assert orch.done
+    assert not orch.held
+
+
+def _layer_orchestrator(printer: FakePrinter) -> Orchestrator:
+    """Orchestrator whose plan binds by LAYER — the real A1 case (line is unusable)."""
+    plan = SwapPlan(swaps=[PlannedSwap(seq=0, filament_index=1, tag="t0", layer=75, line=133871)])
+    orch = Orchestrator(
+        printer,
+        plan,
+        _registry(),
+        EventBus(),
+        printer_id=PRINTER_ID,
+        sense_timeout_s=2.0,
+        sense_poll_s=0.01,
+    )
+    orch.subscribe()
+    return orch
+
+
+async def test_a1_untagged_pause_binds_by_layer_despite_line_zero():
+    """The real A1 pause: reason=UNKNOWN, line=0 (unusable), layer=75 matches the swap → swap.
+
+    Regression for the live 2026-06-25 failure where the layer-75 change was safe-held because the
+    line guard saw line 0. Layer is now the primary guard, so this binds and runs.
+    """
+    printer = FakePrinter(trip_after_polls=1)
+    orch = _layer_orchestrator(printer)
+
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, layer=75, line=0)
+    )
+
+    assert orch.cursor == 1
+    assert orch.held is False
+    assert "routine_confirm_resume" in printer.calls
+
+
+async def test_untagged_pause_at_far_layer_holds():
+    """The spurious start-of-print pause (layer 0) must NOT be taken as the layer-75 swap."""
+    printer = FakePrinter(trip_after_polls=1)
+    orch = _layer_orchestrator(printer)
+
+    await orch.bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, layer=0, line=0)
+    )
+
+    assert orch.cursor == 0  # not advanced
+    assert orch.held is True
+    assert "out of range" in orch.alerts[-1]
+    assert "routine_confirm_resume" not in printer.calls
+
+
+async def test_rearm_detaches_old_orchestrator_no_double_swap():
+    """Re-arming a printer must detach the old orchestrator from the bus, or a single pause runs
+    the swap TWICE (the duplicate-prompt bug observed live 2026-06-25: two submits → 4 prompts)."""
+    bus = EventBus()
+    printer = FakePrinter(trip_after_polls=1)
+    plan = SwapPlan(swaps=[PlannedSwap(seq=0, filament_index=1, tag="t0", layer=2, line=10)])
+
+    old = Orchestrator(
+        printer,
+        plan,
+        _registry(),
+        bus,
+        printer_id=PRINTER_ID,
+        sense_timeout_s=2.0,
+        sense_poll_s=0.01,
+    )
+    old.subscribe()
+    # Second arm (what Brain.arm_job now does): detach the old one, then wire the new one.
+    old.unsubscribe()
+    new = Orchestrator(
+        printer,
+        plan,
+        _registry(),
+        bus,
+        printer_id=PRINTER_ID,
+        sense_timeout_s=2.0,
+        sense_poll_s=0.01,
+    )
+    new.subscribe()
+
+    await bus.publish(
+        PauseEvent(printer_id=PRINTER_ID, reason=PauseReason.UNKNOWN, tag=None, layer=2, line=0)
+    )
+
+    assert new.cursor == 1  # the live orchestrator ran the swap
+    assert old.cursor == 0  # the detached one never heard the pause
+    assert printer.calls.count("routine_confirm_resume") == 1  # exactly ONE swap, not two
 
 
 # ---------------------------------------------------------------------------------------------
