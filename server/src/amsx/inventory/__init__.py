@@ -86,7 +86,8 @@ class FakeSpoolStore:
             id=new_id,
             filament_id=str(self._next),
             material=spec.material,
-            color_hex=spec.color_hex.upper() if spec.color_hex else None,
+            # lstrip('#') mirrors the real store: Spool.color_hex is bare RRGGBB, never "#RRGGBB".
+            color_hex=spec.color_hex.lstrip("#").upper() if spec.color_hex else None,
             name=spec.name,
             remaining_g=spec.initial_g,
             module=spec.module,
@@ -120,6 +121,8 @@ class FakeSpoolStore:
         return updated
 
     async def delete_spool(self, spool_id: str) -> None:
+        # Orphan filament/vendor cleanup on delete is a SpoolmanStore concern — the Fake store
+        # has no separate filament/vendor records to orphan, so it just drops the spool.
         if spool_id not in self._by_id:
             raise KeyError(spool_id)
         del self._by_id[spool_id]

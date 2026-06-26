@@ -189,7 +189,10 @@ class SpoolmanStore:
             params["material"] = spec.material
         r = await self._client.get("/filament", params=params)
         r.raise_for_status()
-        spec_color = spec.color_hex.upper() if spec.color_hex else None
+        # Strip '#' on the spec side too (mirroring the POST body + the filament side below) so a
+        # caller that passes "#RRGGBB" still matches a stored bare "RRGGBB" instead of duplicating.
+        spec_stripped = _strip_hash(spec.color_hex)
+        spec_color = spec_stripped.upper() if spec_stripped else None
         existing = next(
             (
                 f
@@ -257,8 +260,49 @@ class SpoolmanStore:
         return self._spool(r.json())
 
     async def delete_spool(self, spool_id: str) -> None:
-        """DELETE a spool. 404 → KeyError. NOT soft."""
+        """DELETE a spool, then clean up the filament/vendor AMS created for it.
+
+        The spool delete itself is NOT soft (404 → KeyError; other errors propagate). The orphan
+        cleanup that follows IS best-effort: the spool — the thing the operator asked to remove —
+        is already gone, so failing to also remove a now-orphaned filament/vendor is logged, not
+        raised. Cleanup is orphan-GUARDED: the filament is deleted only when no remaining spool
+        (archived included) references it, and its vendor only when no remaining filament does, so
+        anything still in use is never touched.
+        """
+        # Learn the filament/vendor BEFORE deleting so we can orphan-check afterwards.
+        g = await self._client.get(f"/spool/{spool_id}")
+        if g.status_code == 404:
+            raise KeyError(spool_id)
+        g.raise_for_status()
+        fil = g.json().get("filament") or {}
+        filament_id = fil.get("id")
+        vendor_id = (fil.get("vendor") or {}).get("id")
+
         r = await self._client.delete(f"/spool/{spool_id}")
         if r.status_code == 404:
             raise KeyError(spool_id)
         r.raise_for_status()
+
+        try:
+            await self._cleanup_orphans(filament_id, vendor_id)
+        except Exception as exc:  # cascade is best-effort — the spool is already gone
+            _soft("delete_spool orphan cleanup", exc)
+
+    async def _cleanup_orphans(self, filament_id: object, vendor_id: object) -> None:
+        """Delete the filament (then its vendor) iff nothing else still references them."""
+        if filament_id is None:
+            return
+        # Any spool (archived included, all locations) still on this filament? Then keep it.
+        r = await self._client.get("/spool", params={"allow_archived": "true"})
+        r.raise_for_status()
+        if any((s.get("filament") or {}).get("id") == filament_id for s in r.json()):
+            return
+        await self._client.delete(f"/filament/{filament_id}")
+
+        if vendor_id is None:
+            return
+        # Any remaining filament still on this vendor? Then keep it.
+        r = await self._client.get("/filament")
+        r.raise_for_status()
+        if not any((f.get("vendor") or {}).get("id") == vendor_id for f in r.json()):
+            await self._client.delete(f"/vendor/{vendor_id}")

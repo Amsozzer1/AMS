@@ -216,6 +216,27 @@ async def test_spoolman_create_reuses_existing_filament():
     assert spool.id == "42"
 
 
+async def test_spoolman_create_reuses_filament_when_spec_color_has_hash():
+    """A spec colour with a leading '#' still matches a stored bare hex (no duplicate filament)."""
+    filament_no_vendor = {**FILAMENT_RED, "vendor": None}  # stored color_hex "FF0000" (bare)
+    spool_no_vendor = {**SPOOL_RED, "filament": filament_no_vendor}
+    calls: list = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append((req.method, req.url.path))
+        if req.method == "GET" and req.url.path.endswith("/filament"):
+            return httpx.Response(200, json=[filament_no_vendor])
+        if req.method == "POST" and req.url.path.endswith("/spool"):
+            return httpx.Response(200, json=spool_no_vendor)
+        raise AssertionError(f"Unexpected: {req.method} {req.url.path}")
+
+    spec = SpoolSpec(material="PLA", color_hex="#ff0000", name="Red")  # '#' + lowercase
+    spool = await _store(handler).create_spool(spec)
+
+    assert ("POST", "/api/v1/filament") not in calls  # reused, not duplicated
+    assert spool.id == "42"
+
+
 async def test_spoolman_create_reuses_filament_with_matching_vendor():
     """Reuse filament when vendor_id matches existing filament.vendor.id."""
     calls: list = []
@@ -285,18 +306,73 @@ async def test_spoolman_update_404_raises_keyerror():
 # ---------------------------------------------------------------------------
 
 
-async def test_spoolman_delete_sends_delete_request():
+async def test_spoolman_delete_cascades_to_orphan_filament_and_vendor():
+    """Deleting a spool whose filament+vendor are now unused removes all three (FK order)."""
     calls: list = []
 
     def handler(req: httpx.Request) -> httpx.Response:
         calls.append((req.method, req.url.path))
-        if req.method == "DELETE" and "/spool/42" in req.url.path:
+        if req.method == "GET" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json=SPOOL_RED)  # filament 7, vendor 3
+        if req.method == "DELETE" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json={})
+        if req.method == "GET" and req.url.path.endswith("/spool"):
+            return httpx.Response(200, json=[])  # no spool left references filament 7
+        if req.method == "DELETE" and req.url.path.endswith("/filament/7"):
+            return httpx.Response(200, json={})
+        if req.method == "GET" and req.url.path.endswith("/filament"):
+            return httpx.Response(200, json=[])  # no filament left references vendor 3
+        if req.method == "DELETE" and req.url.path.endswith("/vendor/3"):
             return httpx.Response(200, json={})
         raise AssertionError(f"Unexpected: {req.method} {req.url}")
 
-    result = await _store(handler).delete_spool("42")
-    assert result is None
-    assert any("DELETE" == m for m, _ in calls)
+    await _store(handler).delete_spool("42")
+    assert ("DELETE", "/api/v1/spool/42") in calls
+    assert ("DELETE", "/api/v1/filament/7") in calls
+    assert ("DELETE", "/api/v1/vendor/3") in calls
+
+
+async def test_spoolman_delete_keeps_filament_still_in_use():
+    """A filament referenced by another spool is NOT deleted (and so the vendor isn't either)."""
+    calls: list = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append((req.method, req.url.path))
+        if req.method == "GET" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json=SPOOL_RED)
+        if req.method == "DELETE" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json={})
+        if req.method == "GET" and req.url.path.endswith("/spool"):
+            return httpx.Response(200, json=[{"id": 99, "filament": FILAMENT_RED}])  # still used
+        raise AssertionError(f"Unexpected: {req.method} {req.url}")
+
+    await _store(handler).delete_spool("42")
+    assert not any(m == "DELETE" and "/filament/" in p for m, p in calls)
+    assert not any(m == "DELETE" and "/vendor/" in p for m, p in calls)
+
+
+async def test_spoolman_delete_keeps_vendor_with_other_filaments():
+    """Orphan filament is removed, but the vendor stays when another filament still uses it."""
+    calls: list = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append((req.method, req.url.path))
+        if req.method == "GET" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json=SPOOL_RED)
+        if req.method == "DELETE" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json={})
+        if req.method == "GET" and req.url.path.endswith("/spool"):
+            return httpx.Response(200, json=[])
+        if req.method == "DELETE" and req.url.path.endswith("/filament/7"):
+            return httpx.Response(200, json={})
+        if req.method == "GET" and req.url.path.endswith("/filament"):
+            # another filament still belongs to vendor 3 → keep the vendor
+            return httpx.Response(200, json=[{"id": 8, "vendor": {"id": 3}}])
+        raise AssertionError(f"Unexpected: {req.method} {req.url}")
+
+    await _store(handler).delete_spool("42")
+    assert ("DELETE", "/api/v1/filament/7") in calls
+    assert not any(m == "DELETE" and "/vendor/" in p for m, p in calls)
 
 
 async def test_spoolman_delete_404_raises_keyerror():
@@ -305,3 +381,18 @@ async def test_spoolman_delete_404_raises_keyerror():
 
     with pytest.raises(KeyError):
         await _store(handler).delete_spool("nonexistent")
+
+
+async def test_spoolman_delete_orphan_cleanup_failure_is_soft():
+    """If the spool deletes but the cascade GET fails, delete_spool still succeeds."""
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.method == "GET" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json=SPOOL_RED)
+        if req.method == "DELETE" and req.url.path.endswith("/spool/42"):
+            return httpx.Response(200, json={})
+        if req.method == "GET" and req.url.path.endswith("/spool"):
+            raise httpx.ConnectError("down")  # cascade probe fails
+        raise AssertionError(f"Unexpected: {req.method} {req.url}")
+
+    assert await _store(handler).delete_spool("42") is None  # no raise
