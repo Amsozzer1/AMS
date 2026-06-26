@@ -176,6 +176,34 @@ export interface StartArmedResult {
   started: boolean;
 }
 
+// ---- Spool CRUD types (api/__init__.py SpoolCreate / SpoolUpdate) ----
+
+/** Body for POST /api/spools. `color_hex` must be a bare 6-hex string (no `#`). */
+export interface SpoolCreate {
+  material: string;
+  color_hex?: string;
+  name?: string;
+  vendor?: string;
+  initial_g?: number;
+  module?: string;
+  location?: string;
+}
+
+/** Body for PATCH /api/spools/{id}. All fields optional. */
+export interface SpoolUpdate {
+  remaining_g?: number;
+  location?: string;
+  archived?: boolean;
+}
+
+/** One AMS module from GET /api/modules. `filament_index` is null when the
+ *  module slot is unoccupied. */
+export interface ModuleInfo {
+  id: string;
+  cluster_id: string;
+  filament_index: number | null;
+}
+
 // ---- Fetch helpers ----
 
 class ApiError extends Error {}
@@ -359,4 +387,55 @@ export async function answerPrompt(
     throw new ApiError(await extractError(res));
   }
   return (await res.json()) as AnswerResult;
+}
+
+// ---- Spool CRUD ----
+
+/** All configured AMS modules. Used to populate the module dropdown in the
+ *  add-spool form. Returns `[]` when no modules are configured. */
+export function listModules(signal?: AbortSignal): Promise<ModuleInfo[]> {
+  return getJson<ModuleInfo[]>("/api/modules", signal);
+}
+
+/** Create a new spool in the inventory. `body.color_hex` must be bare 6-hex
+ *  (no leading `#`). Throws `ApiError` with the server's `detail` on 422/502. */
+export async function createSpool(body: SpoolCreate): Promise<Spool> {
+  const res = await fetch(`${API_BASE}/api/spools`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new ApiError(await extractError(res));
+  }
+  return (await res.json()) as Spool;
+}
+
+/** Update mutable fields on an existing spool. Throws `ApiError` with the
+ *  server's `detail` on 404/502. */
+export async function updateSpool(id: string, body: SpoolUpdate): Promise<Spool> {
+  const res = await fetch(`${API_BASE}/api/spools/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new ApiError(await extractError(res));
+  }
+  return (await res.json()) as Spool;
+}
+
+/** Delete a spool by id. Returns `{ ok: true, id }`. Throws `ApiError` with the
+ *  server's `detail` on 404/502. */
+export async function deleteSpool(id: string): Promise<{ ok: boolean; id: string }> {
+  const res = await fetch(`${API_BASE}/api/spools/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new ApiError(await extractError(res));
+  }
+  return (await res.json()) as { ok: boolean; id: string };
 }

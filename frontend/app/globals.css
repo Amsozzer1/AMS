@@ -1217,6 +1217,151 @@ section > h2 {
   color: var(--ink-3);
 }
 
+/* =====================================================================
+   Spool inventory manager — add-form + per-row CRUD actions
+   Follows .spool-* / .mapping-* / .map-* / .btn conventions above.
+   ===================================================================== */
+
+/* panel-head with actions cluster (count badge + toggle button) */
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+/* "Add spool" disclosure toggle — small, quiet until clicked */
+.spool-add-toggle {
+  padding: 5px 11px;
+  font-size: var(--t-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  border-radius: var(--radius);
+}
+
+/* managed spool rows get an extra wrapping flex so actions can live at the end */
+.spool-item--managed {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+/* per-row action strip */
+.spool-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+
+/* small action buttons — compact size, no primary colour */
+.spool-act-btn {
+  padding: 4px 9px;
+  font-size: var(--t-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  border-radius: var(--radius);
+}
+.spool-act-btn--danger {
+  color: var(--fault);
+  border-color: var(--fault);
+}
+.spool-act-btn--danger:hover:not(:disabled) {
+  background: var(--fault-soft);
+  border-color: var(--fault);
+}
+
+/* inline grams edit — input + Save / Cancel inline */
+.spool-grams-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.spool-grams-input {
+  width: 80px;
+  background: var(--paper-inset);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-size: var(--t-sm);
+  font-family: var(--font-mono);
+}
+
+/* inline row error — full-width beneath the row content */
+.spool-row-error {
+  flex: 0 0 100%;
+  margin-top: 2px;
+}
+
+/* add-spool disclosure form */
+.spool-add-form {
+  margin-bottom: var(--s-4);
+  padding: var(--s-4);
+  background: var(--paper-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* 2-column auto-fill grid for form fields */
+.spool-add-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-4);
+}
+
+/* text inputs in the add-spool form */
+.spool-text-input {
+  background: var(--paper-card);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  font-size: var(--t-base);
+  font-family: var(--font-body);
+  width: 100%;
+}
+.spool-text-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.spool-text-input:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* colour picker — show it as a small square, let the browser chrome handle it */
+.spool-color-input {
+  width: 44px;
+  height: 38px;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper-card);
+  cursor: pointer;
+  display: block;
+}
+.spool-color-input:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* form field label (inherits .field > label from intake block above) */
+.spool-add-form .field > label {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+
+/* submit + cancel row */
+.spool-add-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
 /* loadout — module rows with an inline spool picker */
 .loadout-list {
   display: flex;
