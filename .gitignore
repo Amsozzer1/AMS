@@ -66,3 +66,4 @@ docs/media/*.jpeg
 .vscode
 CLAUDE.md
 tmp
+spoolman
