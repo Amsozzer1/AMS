@@ -29,6 +29,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
+from amsx.inventory import SpoolStore
 from amsx.protocols import Module, PrinterControl
 from amsx.types import PauseReason, PlannedSwap, SwapPlan, SwapState
 
@@ -64,6 +65,32 @@ Alerter = Callable[[str], Awaitable[None]]
 
 async def _noop_alert(message: str) -> None:  # pragma: no cover - default sink
     return None
+
+
+async def consume_plan(
+    store: SpoolStore,
+    plan: SwapPlan,
+    *,
+    assignment: dict[int, str],
+    loaded: dict[str, str],
+) -> None:
+    """Aggregate the plan's per-index grams by spool and decrement each (best-effort, SOFT).
+
+    `assignment` maps filament_index → module_id (from the confirmed assignment).
+    `loaded` maps module_id → spool_id (from the live inventory).
+    Both should be pre-built by the caller from Brain.assignment and store.list_spools().
+    """
+    grams_by_spool: dict[str, float] = {}
+    for fc in plan.colors:
+        module = assignment.get(fc.index)
+        spool_id = loaded.get(module) if module else None
+        if spool_id and fc.grams:
+            grams_by_spool[spool_id] = grams_by_spool.get(spool_id, 0.0) + fc.grams
+    for spool_id, grams in grams_by_spool.items():
+        try:
+            await store.consume(spool_id, grams)
+        except Exception:  # SOFT — consume errors must never break the swap path
+            pass
 
 
 class PauseValidationError(Exception):
@@ -212,7 +239,12 @@ class SwapStateMachine:
             await asyncio.sleep(ctx.sense_poll_s)
 
     async def _resuming(self, ctx: SwapContext) -> None:
-        """RESUME: hand back to Bambu's routine to load-to-nozzle, purge, and resume the print."""
+        """RESUME: hand back to Bambu's routine to load-to-nozzle, purge, and resume the print.
+
+        If the swap carries colour/material metadata, also tell the printer what it now holds via
+        `set_external_filament`. This is guarded — `PrinterControl` doesn't declare the method, so
+        we use `getattr` to stay compatible with simulators/fakes that don't implement it.
+        """
         self.state = SwapState.RESUMING
         log.info(
             "swap #%d [%s]: RESUMING — sensor tripped, resuming the print",
@@ -220,6 +252,27 @@ class SwapStateMachine:
             ctx.planned_swap.tag,
         )
         await ctx.printer.routine_confirm_resume()
+        # Tell the printer what filament it now holds (best-effort: simulators/fakes may not have
+        # set_external_filament, so guard with getattr and swallow errors softly).
+        _set_ext = getattr(ctx.printer, "set_external_filament", None)
+        if _set_ext is not None and (
+            ctx.planned_swap.material is not None or ctx.planned_swap.color_hex is not None
+        ):
+            try:
+                await _set_ext(ctx.planned_swap.material, ctx.planned_swap.color_hex)
+                log.info(
+                    "swap #%d [%s]: set_external_filament → material=%s color=%s",
+                    ctx.planned_swap.seq,
+                    ctx.planned_swap.tag,
+                    ctx.planned_swap.material,
+                    ctx.planned_swap.color_hex,
+                )
+            except Exception:  # SOFT — don't break the swap if this fails
+                log.warning(
+                    "swap #%d: set_external_filament failed (soft)",
+                    ctx.planned_swap.seq,
+                    exc_info=True,
+                )
 
     async def _to_fault(self, ctx: SwapContext) -> None:
         self.state = SwapState.FAULT

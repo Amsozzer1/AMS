@@ -18,12 +18,12 @@ import os
 from pathlib import Path
 
 from .config import Config, load_config
-from .events import EventBus
+from .events import EventBus, FinishedEvent
 from .inventory import FakeSpoolStore, SpoolStore
 from .inventory.resolver import ProposedRow, Resolver
 from .job import Job, JobParser
 from .module import Cluster, ManualModule, Module, ModuleRegistry
-from .orchestration import Orchestrator
+from .orchestration import Orchestrator, consume_plan
 from .printer import Printer
 from .printer.drivers import A1Driver, PrinterDriver, X1P1Driver
 from .transport import (
@@ -158,6 +158,8 @@ class Brain:
         await self._bring_up_printers()
         # Ensure Spoolman has the custom field we need before any swap; SOFT (logs on error).
         await self.store.ensure_module_field()
+        # Subscribe to FinishedEvent so we can consume spool grams when a print completes.
+        self.events.subscribe(FinishedEvent, self._on_finished)
         self._started = True
         log.info(
             "Brain started (simulate=%s): %d printer(s), %d module(s), %d cluster(s)",
@@ -211,6 +213,29 @@ class Brain:
             printer = Printer(pc.id, link, _make_driver(pc.model), self.events, ftp)
             await printer.connect()
             self.printers[pc.id] = printer
+
+    # ---- finish handler: consume spool grams on print completion ----
+    async def _on_finished(self, event: FinishedEvent) -> None:
+        """On printer FINISHED, decrement spool grams for the completed plan (best-effort, SOFT).
+
+        Builds `assignment` (index→module) and `loaded` (module→spool_id) snapshots, then
+        delegates to `consume_plan`. A failed/cancelled print just doesn't consume (acceptable).
+        """
+        printer_id = event.printer_id
+        orch = self.orchestrators.get(printer_id)
+        if orch is None:
+            return
+        per_printer = self.assignment.get(printer_id, {})
+        if not per_printer:
+            return
+        try:
+            assignment = {idx: row.module for idx, row in per_printer.items() if row.module}
+            spools = await self.store.list_spools()
+            loaded = {s.module: s.id for s in spools if s.module}
+            await consume_plan(self.store, orch.plan, assignment=assignment, loaded=loaded)
+            log.info("brain: consumed spool grams for printer %s on FINISH", printer_id)
+        except Exception:  # SOFT — consume errors must not surface to the operator
+            log.warning("brain: consume_plan failed for %s (soft)", printer_id, exc_info=True)
 
     # ---- the front-end entry point ----
     async def arm_job(self, printer_id: PrinterId, file: str | Path) -> Orchestrator:

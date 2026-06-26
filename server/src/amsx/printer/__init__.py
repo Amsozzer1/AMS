@@ -19,7 +19,7 @@ from __future__ import annotations
 import copy
 import logging
 
-from ..events import EventBus, FaultEvent, PauseEvent, SensorEvent
+from ..events import EventBus, FaultEvent, FinishedEvent, PauseEvent, SensorEvent
 from ..transport import FtpClient, PrinterLink, Report
 from ..types import FilamentRef, PauseReason, PrinterId, PrinterStage
 from .drivers import PrinterDriver
@@ -144,6 +144,11 @@ class Printer:
             await self.bus.publish(
                 PauseEvent(printer_id=self.id, reason=reason, layer=layer, line=line)
             )
+
+        # Emit a finished event on a fresh transition into FINISHED.
+        if self.state.stage == PrinterStage.FINISHED and prev_stage != PrinterStage.FINISHED:
+            log.info("printer %s: ▶ FINISHED — emitting FinishedEvent", self.id)
+            await self.bus.publish(FinishedEvent(printer_id=self.id))
 
         # Emit a sensor event when the present-sensor actually changes.
         if self.state.filament_sensor != prev_sensor:

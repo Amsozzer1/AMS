@@ -58,7 +58,14 @@ class FaultEvent:
     detail: str
 
 
-Event = PauseEvent | SensorEvent | ModuleEvent | FaultEvent
+@dataclass(frozen=True)
+class FinishedEvent:
+    """Printer reported gcode_state→FINISH. Brain uses this to consume spool grams (SOFT)."""
+
+    printer_id: PrinterId
+
+
+Event = PauseEvent | SensorEvent | ModuleEvent | FaultEvent | FinishedEvent
 Handler = Callable[[Event], Awaitable[None]]
 
 
