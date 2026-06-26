@@ -245,7 +245,9 @@ function DetailHeader({ id }: { id: string }) {
         <Link href="/" className="back-link">
           ← Dashboard
         </Link>
-        <h1 style={{ marginTop: 6 }}>Printer · {id}</h1>
+        <h1 className="detail-title">
+          Printer · <span className="mono">{id}</span>
+        </h1>
       </div>
     </header>
   );

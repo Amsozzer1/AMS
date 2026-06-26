@@ -4,9 +4,9 @@
   "private": true,
   "description": "AMS-X operator UI — live printer dashboard, 3MF upload, and the human-swap prompt loop.",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 9000",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 9000",
     "lint": "next lint"
   },
   "dependencies": {

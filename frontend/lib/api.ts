@@ -5,7 +5,7 @@
 // and relays operator actions. No business logic lives here.
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "http://127.0.0.1:9001";
 
 // ---- Response types (authoritative: api/__init__.py) ----
 
@@ -87,6 +87,46 @@ export interface AnswerResult {
   prompt_id: string;
 }
 
+// ---- Orchestrator (live swap loop) ----
+// GET /api/printers/{id}/orchestrator returns either an armed status (below) or
+// `{ armed: false, printer_id }` before a job is armed. The swap_state strings
+// mirror the server state machine; treated as an opaque label by the UI.
+export type SwapState =
+  | "WATCHING"
+  | "UNLOADING"
+  | "SELECTING"
+  | "FEEDING"
+  | "SENSING"
+  | "RESUMING"
+  | "FAULT"
+  | (string & {});
+
+export interface OrchestratorSwap {
+  seq: number;
+  filament_index: number;
+  tag: string;
+  current: boolean;
+}
+
+export interface OrchestratorArmed {
+  armed: true;
+  printer_id: string;
+  cursor: number;
+  total: number;
+  done: boolean;
+  held: boolean;
+  swap_state: SwapState;
+  alerts: string[];
+  swaps: OrchestratorSwap[];
+}
+
+export interface OrchestratorIdle {
+  armed: false;
+  printer_id: string;
+}
+
+export type OrchestratorStatus = OrchestratorArmed | OrchestratorIdle;
+
 // ---- Fetch helpers ----
 
 class ApiError extends Error {}
@@ -139,13 +179,30 @@ export function listPrompts(signal?: AbortSignal): Promise<Prompt[]> {
   return getJson<Prompt[]>("/api/prompts", signal);
 }
 
-/** Upload a sliced `.gcode.3mf` for a printer. Throws with the server's 400
- *  detail message on a bad/sliceless file. */
-export async function submitJob(printerId: string, file: File): Promise<JobResult> {
+/** Live swap-loop status for a printer. Returns `{ armed:false }` until a job is
+ *  armed. The UI renders the swap progress strip from the armed shape. */
+export function getOrchestrator(
+  id: string,
+  signal?: AbortSignal,
+): Promise<OrchestratorStatus> {
+  return getJson<OrchestratorStatus>(
+    `/api/printers/${encodeURIComponent(id)}/orchestrator`,
+    signal,
+  );
+}
+
+/** Upload a sliced `.gcode.3mf` for a printer. When `start` is false the plan is
+ *  ARMED only (the operator starts the print from Bambu Studio). Throws with the
+ *  server's 400 detail message on a bad/sliceless file. */
+export async function submitJob(
+  printerId: string,
+  file: File,
+  start = true,
+): Promise<JobResult> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(
-    `${API_BASE}/api/printers/${encodeURIComponent(printerId)}/job`,
+    `${API_BASE}/api/printers/${encodeURIComponent(printerId)}/job?start=${start}`,
     { method: "POST", body: form, cache: "no-store" },
   );
   if (!res.ok) {
