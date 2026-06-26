@@ -128,13 +128,26 @@ class Brain:
 
         # Spool inventory: populated in __init__ from config; tests may replace brain.store before
         # start() is called.  assignment maps printer_id -> {filament_index -> ProposedRow}.
-        self.store: SpoolStore = FakeSpoolStore()
-        self.resolver: Resolver = Resolver(self.store)
+        # Use the property setter so resolver is always built from the current store.
+        self._store: SpoolStore = FakeSpoolStore()
+        self.resolver: Resolver = Resolver(self._store)
         self.assignment: dict[PrinterId, dict[int, ProposedRow]] = {}
+        # confirmed tracks which printers have had their job/assignment POST-confirmed.
+        self.confirmed: set[PrinterId] = set()
 
         self._module_by_id: dict[ModuleId, Module] = {}
         self._printer_buses: dict[PrinterId, MqttBus] = {}
         self._started = False
+
+    # ---- store property: setter rebuilds resolver ----
+    @property
+    def store(self) -> SpoolStore:
+        return self._store
+
+    @store.setter
+    def store(self, value: SpoolStore) -> None:
+        self._store = value
+        self.resolver = Resolver(value)
 
     # ---- lifecycle ----
     async def start(self) -> None:
@@ -223,6 +236,8 @@ class Brain:
         orch = Orchestrator(printer, plan, self.registry, self.events, printer_id=printer_id)
         orch.subscribe()
         self.orchestrators[printer_id] = orch
+        # New job: clear any previous confirmation so the operator must re-confirm.
+        self.confirmed.discard(printer_id)
         # Compute a best-effort spool proposal for the operator; cached until re-arm.
         try:
             self.assignment[printer_id] = await self.resolver.propose(plan)
@@ -256,5 +271,5 @@ def build_brain(config_path: str | Path | None = None, *, simulate: bool = True)
         brain.store = SpoolmanStore(config.spoolman)
     else:
         brain.store = FakeSpoolStore()
-    brain.resolver = Resolver(brain.store)
+    # brain.store setter already rebuilds brain.resolver — no extra step needed.
     return brain

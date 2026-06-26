@@ -289,29 +289,45 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
                     "status": row.status,
                 }
             )
-        return {"rows": rows, "confirmed": False}
+        return {"rows": rows, "confirmed": printer_id in b.confirmed}
 
     @app.post("/api/printers/{printer_id}/job/assignment")
     async def confirm_assignment(printer_id: str, body: dict[str, str]) -> dict[str, Any]:
         """Confirm (and optionally override) the index→module mapping.
 
-        Body: `{index: module_id}` for each filament index. For gap rows where a module is now
-        assigned, writes `set_module` on the store so the spool knows where it lives.
+        Body: `{index: module_id}` for each filament index. Persists each override into
+        brain.assignment so a follow-up GET reflects the chosen module/status. For rows
+        that carry a spool_id, also calls set_module on the store (SOFT — store errors are
+        logged and skipped so Spoolman down never 500s this endpoint).
         Returns `{ok: true}`.
         """
         b = _brain()
         if printer_id not in b.printers:
             raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
-        proposal = b.assignment.get(printer_id, {})
+        proposal = b.assignment.setdefault(printer_id, {})
         for index_str, module_id in body.items():
             try:
                 idx = int(index_str)
             except ValueError:
                 continue
             row = proposal.get(idx)
-            # If the row had a gap (no module) but operator now assigned one, update the store.
-            if row is not None and row.status == "gap" and row.spool_id:
-                await b.store.set_module(row.spool_id, module_id)
+            if row is not None:
+                # Persist the operator's choice: update the row with the confirmed module.
+                from dataclasses import replace as _replace
+
+                proposal[idx] = _replace(row, module=module_id, status="loaded")
+                # If the row has a spool, tell the store where it lives — SOFT.
+                if row.spool_id:
+                    try:
+                        await b.store.set_module(row.spool_id, module_id)
+                    except Exception:
+                        log.warning(
+                            "set_module failed for spool %s → %s (soft)",
+                            row.spool_id,
+                            module_id,
+                            exc_info=True,
+                        )
+        b.confirmed.add(printer_id)
         return {"ok": True}
 
     # ---- simulate-only test hooks --------------------------------------------------------

@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from amsx.api import create_app
 from amsx.config import Config, ModuleConfig, PrinterConfig
 from amsx.inventory import FakeSpoolStore
+from amsx.inventory.resolver import ProposedRow
 from amsx.types import Spool
 
 
@@ -108,3 +109,53 @@ def test_get_job_assignment_unknown_printer_404():
 def test_post_job_assignment_unknown_printer_404():
     with _client() as c:
         assert c.post("/api/printers/ghost/job/assignment", json={"0": "m1"}).status_code == 404
+
+
+def test_job_assignment_get_post_get_round_trip():
+    """GET→POST→GET round-trip: POST persists the override and flips confirmed False→True."""
+    brain = _brain_with_store([_SPOOL])
+    # Inject a pre-built proposal with one gap row (index=1) and one loaded row (index=0).
+    brain.assignment["x1c-1"] = {
+        0: ProposedRow(
+            index=0,
+            material="PLA",
+            color_hex="FFFFFF",
+            grams=100.0,
+            module="m1",
+            spool_id="1",
+            status="loaded",
+        ),
+        1: ProposedRow(
+            index=1,
+            material="PLA",
+            color_hex="FF0000",
+            grams=80.0,
+            module=None,
+            spool_id=None,
+            status="gap",
+        ),
+    }
+    app = create_app(brain)
+    with TestClient(app) as c:
+        # (a) Initial GET: confirmed must be False.
+        r_before = c.get("/api/printers/x1c-1/job/assignment")
+        assert r_before.status_code == 200
+        body_before = r_before.json()
+        assert body_before["confirmed"] is False
+
+        # POST: operator confirms index 1 → module "m2".
+        r_post = c.post("/api/printers/x1c-1/job/assignment", json={"1": "m2"})
+        assert r_post.status_code == 200
+        assert r_post.json()["ok"] is True
+
+        # (b) Final GET: index 1 row must now have module="m2", status="loaded"; confirmed=True.
+        r_after = c.get("/api/printers/x1c-1/job/assignment")
+        assert r_after.status_code == 200
+        body_after = r_after.json()
+        assert body_after["confirmed"] is True
+        rows_by_index = {row["index"]: row for row in body_after["rows"]}
+        assert rows_by_index[1]["module"] == "m2"
+        assert rows_by_index[1]["status"] == "loaded"
+        # index 0 (loaded from start) must be unchanged.
+        assert rows_by_index[0]["module"] == "m1"
+        assert rows_by_index[0]["status"] == "loaded"
