@@ -38,6 +38,17 @@ class PrinterDriver(Protocol):
     def parse_pause_reason(self, report: Report) -> PauseReason: ...
     def parse_filament_present(self, report: Report) -> bool | None: ...
 
+    def parse_external_filament(self, report: Report) -> tuple[str | None, str | None]: ...
+    def request_set_external_filament(
+        self,
+        material: str | None,
+        color_hex: str | None,
+        *,
+        tray_info_idx: str = "GFL04",
+        tmin: int = 190,
+        tmax: int = 240,
+    ) -> Report: ...
+
 
 class X1P1Driver:
     """Driver for X1 / P1 series (first target). Routine payloads are PHASE-0 stubs.
@@ -147,6 +158,22 @@ class X1P1Driver:
                 return val
         return None
 
+    def parse_external_filament(self, report: Report) -> tuple[str | None, str | None]:
+        """X1/P1 does not expose vt_tray — returns (None, None) as a safe no-op."""
+        return None, None
+
+    def request_set_external_filament(
+        self,
+        material: str | None,
+        color_hex: str | None,
+        *,
+        tray_info_idx: str = "GFL04",
+        tmin: int = 190,
+        tmax: int = 240,
+    ) -> Report:
+        """X1/P1 does not support ams_filament_setting via this path — returns empty payload."""
+        return {"print": {}}
+
 
 class A1Driver:
     """Driver for the A1 series (incl. A1 mini).
@@ -170,6 +197,7 @@ class A1Driver:
     _PRINT_KEY = "print"
     # Confirmed live (A1 mini, 2026-06-24): toolhead filament-present switch.
     _SENSOR_FIELD = "hw_switch_state"
+    _VT_TRAY = "vt_tray"
 
     def __init__(self) -> None:
         self._seq = 0
@@ -256,6 +284,52 @@ class A1Driver:
                 "layer_inspect": False,
                 "ams_mapping": [],  # external spool — no AMS tray map (list, not "")
                 "use_ams": False,  # external spool — never the AMS
+            }
+        }
+
+    def parse_external_filament(self, report: Report) -> tuple[str | None, str | None]:
+        """Read the external spool's material + colour from ``print.vt_tray`` — confirmed live.
+
+        Returns ``(material, color_hex6)`` where ``color_hex6`` is the first 6 chars of
+        ``tray_color`` uppercased (stripping the AA alpha byte Bambu appends).
+        Returns ``(None, None)`` when the report doesn't carry ``vt_tray``.
+        """
+        blob = report.get(self._PRINT_KEY)
+        vt = blob.get(self._VT_TRAY) if isinstance(blob, dict) else None
+        if not isinstance(vt, dict):
+            return None, None
+        color = vt.get("tray_color")
+        hex6 = color[:6].upper() if isinstance(color, str) and len(color) >= 6 else None
+        return vt.get("tray_type"), hex6
+
+    def request_set_external_filament(
+        self,
+        material: str | None,
+        color_hex: str | None,
+        *,
+        tray_info_idx: str = "GFL04",
+        tmin: int = 190,
+        tmax: int = 240,
+    ) -> Report:
+        """Build the ``ams_filament_setting`` command to tell the printer what it now holds.
+
+        Confirmed protocol (live A1 mini): ``ams_id=255, tray_id=254, slot_id=0`` addresses
+        the external spool. ``tray_color`` is 8-char RRGGBBAA uppercase (we append ``"FF"``).
+        """
+        rgba = ((color_hex or "FFFFFF").upper()[:6]) + "FF"
+        return {
+            "print": {
+                "sequence_id": self._next_seq(),
+                "command": "ams_filament_setting",
+                "ams_id": 255,
+                "tray_id": 254,
+                "slot_id": 0,
+                "tray_info_idx": tray_info_idx,
+                "setting_id": "",
+                "tray_color": rgba,
+                "tray_type": material or "PLA",
+                "nozzle_temp_min": tmin,
+                "nozzle_temp_max": tmax,
             }
         }
 

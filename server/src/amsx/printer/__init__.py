@@ -240,6 +240,18 @@ class Printer:
         """Brain-only setter for the Pi-authoritative loaded filament (called after a swap)."""
         self.state.loaded_filament = ref
 
+    def read_external_filament(self) -> tuple[str | None, str | None]:
+        """Read (material, color_hex6) from the cached vt_tray snapshot.
+
+        Delegates to the driver so X1/P1 returns (None, None) and A1 extracts from
+        ``state.raw["print"]["vt_tray"]`` — no live MQTT call, just the cached full report.
+        """
+        return self.driver.parse_external_filament({"print": self.state.raw.get("print", {})})
+
+    async def set_external_filament(self, material: str | None, color_hex: str | None) -> None:
+        """Tell the printer what filament it now holds (after a swap) via ams_filament_setting."""
+        await self.link.request(self.driver.request_set_external_filament(material, color_hex))
+
     # -- PrinterControl Protocol --------------------------------------------------------------
     @property
     def loaded_filament(self) -> FilamentRef | None:
