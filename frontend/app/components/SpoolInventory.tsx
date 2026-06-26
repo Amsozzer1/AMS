@@ -240,6 +240,9 @@ interface AddSpoolFormProps {
 function AddSpoolForm({ onSuccess, onCancel }: AddSpoolFormProps) {
   const [material, setMaterial] = useState("");
   const [color, setColor] = useState("#ffffff");
+  // <input type="color"> has no empty state, so a default would silently send white. This
+  // gates whether a colour is sent at all — unchecked omits color_hex (a colourless spool).
+  const [hasColor, setHasColor] = useState(true);
   const [name, setName] = useState("");
   const [vendor, setVendor] = useState("");
   const [initialG, setInitialG] = useState("1000");
@@ -271,8 +274,8 @@ function AddSpoolForm({ onSuccess, onCancel }: AddSpoolFormProps) {
         setError("Initial grams must be a non-negative number.");
         return;
       }
-      // Strip the '#' from the colour picker value before sending
-      const bareHex = color.replace(/^#/, "");
+      // Send the colour only when the operator opted in; strip the '#' before sending.
+      const bareHex = hasColor ? color.replace(/^#/, "") : undefined;
       setBusy(true);
       setError(null);
       try {
@@ -291,7 +294,7 @@ function AddSpoolForm({ onSuccess, onCancel }: AddSpoolFormProps) {
         setBusy(false);
       }
     },
-    [material, color, name, vendor, initialG, moduleId, onSuccess],
+    [material, color, hasColor, name, vendor, initialG, moduleId, onSuccess],
   );
 
   return (
@@ -312,17 +315,28 @@ function AddSpoolForm({ onSuccess, onCancel }: AddSpoolFormProps) {
           />
         </div>
 
-        {/* colour picker */}
+        {/* colour picker + opt-out */}
         <div className="field">
           <label htmlFor="spool-color">Colour</label>
-          <input
-            id="spool-color"
-            className="spool-color-input"
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            disabled={busy}
-          />
+          <div className="spool-color-row">
+            <input
+              id="spool-color"
+              className="spool-color-input"
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              disabled={busy || !hasColor}
+            />
+            <label className="spool-color-none">
+              <input
+                type="checkbox"
+                checked={!hasColor}
+                onChange={(e) => setHasColor(!e.target.checked)}
+                disabled={busy}
+              />
+              No colour
+            </label>
+          </div>
         </div>
 
         {/* optional name */}

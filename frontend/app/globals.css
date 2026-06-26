@@ -1344,6 +1344,23 @@ section > h2 {
   opacity: 0.6;
   cursor: default;
 }
+.spool-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.spool-color-none {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
 
 /* form field label (inherits .field > label from intake block above) */
 .spool-add-form .field > label {
