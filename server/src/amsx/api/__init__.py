@@ -335,6 +335,8 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         except Exception as exc:
             log.exception("API: delete_spool FAILED for %s", spool_id)
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+        # Success return is outside the try — the dict can't raise, so it doesn't belong
+        # under the error guard.
         return {"ok": True, "id": spool_id}
 
     @app.get("/api/spools")

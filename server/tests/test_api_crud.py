@@ -76,6 +76,9 @@ def test_get_modules_fields():
 
 
 # ---- POST /api/spools -------------------------------------------------------------------
+# Note: vendor/location round-trip coverage lives in tests/test_inventory_crud.py — the
+# FakeSpoolStore intentionally drops them (Spool has no such fields), so that boundary is
+# tested there, not here.
 
 
 def test_post_spool_creates_and_returns_spool():

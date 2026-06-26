@@ -77,6 +77,9 @@ class FakeSpoolStore:
         return None
 
     async def create_spool(self, spec: SpoolSpec) -> Spool:
+        # spec.vendor and spec.location are intentionally NOT modeled here: Spool has no
+        # vendor/location field, so the Fake store drops them. The real SpoolmanStore
+        # forwards them to Spoolman. This is the coverage boundary, not a missing field.
         new_id = str(self._next)
         self._next += 1
         spool = Spool(
@@ -98,7 +101,10 @@ class FakeSpoolStore:
         spool_id: str,
         *,
         remaining_g: float | None = None,
-        location: str | None = None,  # no local storage; accepted but not reflected in Spool
+        # location is intentionally NOT modeled: Spool has no location field, so the Fake
+        # store accepts the argument (matching the SpoolStore Protocol) but drops it. The
+        # real SpoolmanStore forwards it. This is the coverage boundary, not a missing field.
+        location: str | None = None,
         archived: bool | None = None,
     ) -> Spool:
         s = self._by_id.get(spool_id)

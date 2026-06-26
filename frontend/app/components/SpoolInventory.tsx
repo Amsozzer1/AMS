@@ -71,8 +71,11 @@ function SpoolRow({ s, onRefresh }: SpoolRowProps) {
       setEditError("Enter a valid non-negative number.");
       return;
     }
-    setEditBusy(true);
+    // Clear all row errors so only this action's error can show.
     setEditError(null);
+    setArchiveError(null);
+    setDeleteError(null);
+    setEditBusy(true);
     try {
       await updateSpool(s.id, { remaining_g: val });
       setEditing(false);
@@ -94,8 +97,11 @@ function SpoolRow({ s, onRefresh }: SpoolRowProps) {
   const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const doArchive = useCallback(async () => {
-    setArchiveBusy(true);
+    // Clear all row errors so only this action's error can show.
+    setEditError(null);
     setArchiveError(null);
+    setDeleteError(null);
+    setArchiveBusy(true);
     try {
       await updateSpool(s.id, { archived: true });
       onRefresh();
@@ -112,8 +118,11 @@ function SpoolRow({ s, onRefresh }: SpoolRowProps) {
 
   const doDelete = useCallback(async () => {
     if (!window.confirm(`Delete spool "${title}"? This cannot be undone.`)) return;
-    setDeleteBusy(true);
+    // Clear all row errors so only this action's error can show.
+    setEditError(null);
+    setArchiveError(null);
     setDeleteError(null);
+    setDeleteBusy(true);
     try {
       await deleteSpool(s.id);
       onRefresh();
