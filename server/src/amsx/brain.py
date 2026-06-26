@@ -231,7 +231,17 @@ class Brain:
         try:
             assignment = {idx: row.module for idx, row in per_printer.items() if row.module}
             spools = await self.store.list_spools()
-            loaded = {s.module: s.id for s in spools if s.module}
+            # Build store-derived loadout first, then overlay the confirmed assignment rows so
+            # a spool that was assigned to a module but not yet reflected in store.list_spools()
+            # extra.ams_module (e.g. Spoolman was down when the job started) is not silently
+            # skipped — the assignment row already carries its own resolved spool_id.
+            loaded: dict[str, str] = {s.module: s.id for s in spools if s.module}
+            assignment_loadout = {
+                row.module: row.spool_id
+                for row in per_printer.values()
+                if row.module and row.spool_id
+            }
+            loaded.update(assignment_loadout)  # assignment rows take precedence
             await consume_plan(self.store, orch.plan, assignment=assignment, loaded=loaded)
             log.info("brain: consumed spool grams for printer %s on FINISH", printer_id)
         except Exception:  # SOFT — consume errors must not surface to the operator

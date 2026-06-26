@@ -11,6 +11,7 @@ import logging
 import os
 import tempfile
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -313,9 +314,7 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             row = proposal.get(idx)
             if row is not None:
                 # Persist the operator's choice: update the row with the confirmed module.
-                from dataclasses import replace as _replace
-
-                proposal[idx] = _replace(row, module=module_id, status="loaded")
+                proposal[idx] = replace(row, module=module_id, status="loaded")
                 # If the row has a spool, tell the store where it lives — SOFT.
                 if row.spool_id:
                     try:

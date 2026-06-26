@@ -57,10 +57,4 @@ addopts = "-ra"
 # ---- ty (type checker) ----
 [tool.ty]
 
-[dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
-    "ruff>=0.15.18",
-]
 # defaults are fine for now; src layout is auto-detected

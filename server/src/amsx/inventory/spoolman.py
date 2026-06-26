@@ -112,9 +112,10 @@ class SpoolmanStore:
             r.raise_for_status()
             if any(f.get("key") == MODULE_FIELD for f in r.json()):
                 return
-            await self._client.post(
+            post_r = await self._client.post(
                 f"/field/spool/{MODULE_FIELD}",
                 json={"name": "AMS Module", "field_type": "text"},
             )
+            post_r.raise_for_status()
         except Exception:
             log.warning("Spoolman ensure_module_field failed (soft)", exc_info=True)

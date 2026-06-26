@@ -4,6 +4,7 @@ the operator confirms/overrides the mapping. No auto-assignment guarantees, no d
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from ..types import FilamentColor, ModuleId, SwapPlan
 from . import SpoolStore
@@ -17,7 +18,7 @@ class ProposedRow:
     grams: float | None
     module: ModuleId | None
     spool_id: str | None
-    status: str  # "loaded" | "gap"
+    status: Literal["loaded", "gap"]
 
 
 class Resolver:

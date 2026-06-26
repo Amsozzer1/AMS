@@ -252,6 +252,9 @@ class SwapStateMachine:
             ctx.planned_swap.tag,
         )
         await ctx.printer.routine_confirm_resume()
+        # set_external_filament fires AFTER routine_confirm_resume intentionally: the routine
+        # completes the load-to-nozzle + purge sequence, so by the time we tag the filament the
+        # printer actually holds what we're declaring (tells it what it now holds post-resume).
         # Tell the printer what filament it now holds (best-effort: simulators/fakes may not have
         # set_external_filament, so guard with getattr and swallow errors softly).
         _set_ext = getattr(ctx.printer, "set_external_filament", None)
@@ -399,6 +402,8 @@ class Orchestrator:
             await self._alert(unguarded)
 
         async with self._swap_lock:
+            # TODO: SELECTING still uses the static config registry map — brain.assignment is not
+            # yet wired here, so the confirmed colour→module mapping has no effect on swap routing.
             next_module = self.registry.for_filament_index(swap.filament_index)
             old_module = self._current_old_module()
             log.info(
