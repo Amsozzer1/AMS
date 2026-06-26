@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Protocol, runtime_checkable
 
-from ..types import ModuleId, Spool
+from ..types import ModuleId, Spool, SpoolSpec
 
 __all__ = ["FakeSpoolStore", "SpoolStore"]
 
@@ -23,6 +23,16 @@ class SpoolStore(Protocol):
     async def match(self, material: str | None, color_hex: str | None) -> list[Spool]: ...
     async def consume(self, spool_id: str, grams: float) -> None: ...
     async def ensure_module_field(self) -> None: ...
+    async def create_spool(self, spec: SpoolSpec) -> Spool: ...
+    async def update_spool(
+        self,
+        spool_id: str,
+        *,
+        remaining_g: float | None = None,
+        location: str | None = None,
+        archived: bool | None = None,
+    ) -> Spool: ...
+    async def delete_spool(self, spool_id: str) -> None: ...
 
 
 class FakeSpoolStore:
@@ -30,6 +40,9 @@ class FakeSpoolStore:
 
     def __init__(self, spools: list[Spool] | None = None) -> None:
         self._by_id: dict[str, Spool] = {s.id: s for s in (spools or [])}
+        # Start id counter past any seeded numeric ids to avoid collisions.
+        numeric_ids = [int(s.id) for s in (spools or []) if s.id.isdigit()]
+        self._next: int = max(numeric_ids, default=0) + 1
 
     async def list_spools(self, *, include_archived: bool = False) -> list[Spool]:
         return [s for s in self._by_id.values() if include_archived or not s.archived]
@@ -62,3 +75,45 @@ class FakeSpoolStore:
 
     async def ensure_module_field(self) -> None:
         return None
+
+    async def create_spool(self, spec: SpoolSpec) -> Spool:
+        new_id = str(self._next)
+        self._next += 1
+        spool = Spool(
+            id=new_id,
+            filament_id=str(self._next),
+            material=spec.material,
+            color_hex=spec.color_hex.upper() if spec.color_hex else None,
+            name=spec.name,
+            remaining_g=spec.initial_g,
+            module=spec.module,
+            archived=False,
+        )
+        self._next += 1
+        self._by_id[new_id] = spool
+        return spool
+
+    async def update_spool(
+        self,
+        spool_id: str,
+        *,
+        remaining_g: float | None = None,
+        location: str | None = None,  # no local storage; accepted but not reflected in Spool
+        archived: bool | None = None,
+    ) -> Spool:
+        s = self._by_id.get(spool_id)
+        if s is None:
+            raise KeyError(spool_id)
+        kwargs: dict[str, object] = {}
+        if remaining_g is not None:
+            kwargs["remaining_g"] = remaining_g
+        if archived is not None:
+            kwargs["archived"] = archived
+        updated = replace(s, **kwargs)
+        self._by_id[spool_id] = updated
+        return updated
+
+    async def delete_spool(self, spool_id: str) -> None:
+        if spool_id not in self._by_id:
+            raise KeyError(spool_id)
+        del self._by_id[spool_id]

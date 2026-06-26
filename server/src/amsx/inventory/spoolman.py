@@ -13,10 +13,32 @@ import logging
 import httpx
 
 from ..config import SpoolmanConfig
-from ..types import ModuleId, Spool
+from ..types import ModuleId, Spool, SpoolSpec
 
 log = logging.getLogger("amsx.inventory")
 MODULE_FIELD = "ams_module"
+
+# Filament density defaults by material (g/cm³), diameter always 1.75 mm.
+_DENSITY: dict[str, float] = {
+    "PLA": 1.24,
+    "PETG": 1.27,
+    "ABS": 1.04,
+    "ASA": 1.07,
+    "TPU": 1.21,
+    "PC": 1.20,
+    "PA": 1.14,
+    "NYLON": 1.14,
+    "PVA": 1.23,
+    "HIPS": 1.04,
+}
+_DIAMETER = 1.75
+
+
+def _strip_hash(hex_value: str | None) -> str | None:
+    """Return None for falsy values, else strip any leading '#'."""
+    if not hex_value:
+        return None
+    return hex_value.lstrip("#")
 
 
 def _soft(op: str, exc: Exception) -> None:
@@ -138,3 +160,104 @@ class SpoolmanStore:
             post_r.raise_for_status()
         except Exception as exc:
             _soft("ensure_module_field", exc)
+
+    async def create_spool(self, spec: SpoolSpec) -> Spool:
+        """Create a new spool in Spoolman, creating-or-reusing the filament and vendor records.
+
+        NOT soft — let errors propagate to the caller.
+        """
+        # 1. Resolve vendor_id
+        vendor_id: int | None = None
+        if spec.vendor:
+            r = await self._client.get("/vendor")
+            r.raise_for_status()
+            match = next(
+                (v for v in r.json() if v["name"].lower() == spec.vendor.lower()),
+                None,
+            )
+            if match:
+                vendor_id = match["id"]
+            else:
+                r = await self._client.post("/vendor", json={"name": spec.vendor})
+                r.raise_for_status()
+                vendor_id = r.json()["id"]
+
+        # 2. Resolve filament_id
+        filament_id: int
+        params: dict[str, object] = {}
+        if spec.material:
+            params["material"] = spec.material
+        r = await self._client.get("/filament", params=params)
+        r.raise_for_status()
+        spec_color = spec.color_hex.upper() if spec.color_hex else None
+        existing = next(
+            (
+                f
+                for f in r.json()
+                if (_strip_hash(f.get("color_hex")) or "").upper() == (spec_color or "")
+                and (f.get("vendor") or {}).get("id") == vendor_id
+                and f.get("name") == spec.name
+            ),
+            None,
+        )
+        if existing:
+            filament_id = existing["id"]
+        else:
+            body: dict[str, object] = {
+                "material": spec.material,
+                "density": _DENSITY.get((spec.material or "").upper(), 1.24),
+                "diameter": _DIAMETER,
+            }
+            if spec.name is not None:
+                body["name"] = spec.name
+            if vendor_id is not None:
+                body["vendor_id"] = vendor_id
+            stripped = _strip_hash(spec.color_hex)
+            if stripped is not None:
+                body["color_hex"] = stripped
+            r = await self._client.post("/filament", json=body)
+            r.raise_for_status()
+            filament_id = r.json()["id"]
+
+        # 3. Create the spool
+        spool_body: dict[str, object] = {
+            "filament_id": filament_id,
+            "initial_weight": spec.initial_g,
+            "remaining_weight": spec.initial_g,
+            "extra": {MODULE_FIELD: json.dumps(spec.module or "")},
+        }
+        location = spec.location or self._cfg.active_location
+        if location is not None:
+            spool_body["location"] = location
+        r = await self._client.post("/spool", json=spool_body)
+        r.raise_for_status()
+        return self._spool(r.json())
+
+    async def update_spool(
+        self,
+        spool_id: str,
+        *,
+        remaining_g: float | None = None,
+        location: str | None = None,
+        archived: bool | None = None,
+    ) -> Spool:
+        """PATCH a spool with only the supplied fields. 404 → KeyError. NOT soft."""
+        body: dict[str, object] = {}
+        if remaining_g is not None:
+            body["remaining_weight"] = remaining_g
+        if location is not None:
+            body["location"] = location
+        if archived is not None:
+            body["archived"] = archived
+        r = await self._client.patch(f"/spool/{spool_id}", json=body)
+        if r.status_code == 404:
+            raise KeyError(spool_id)
+        r.raise_for_status()
+        return self._spool(r.json())
+
+    async def delete_spool(self, spool_id: str) -> None:
+        """DELETE a spool. 404 → KeyError. NOT soft."""
+        r = await self._client.delete(f"/spool/{spool_id}")
+        if r.status_code == 404:
+            raise KeyError(spool_id)
+        r.raise_for_status()

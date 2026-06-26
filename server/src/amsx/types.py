@@ -97,6 +97,19 @@ class Spool:
 
 
 @dataclass(frozen=True)
+class SpoolSpec:
+    """Operator's request to create one spool (AMS resolves/creates the Spoolman filament)."""
+
+    material: str
+    color_hex: str | None = None  # bare 6-hex RRGGBB (no '#'); upper/lower accepted
+    name: str | None = None
+    vendor: str | None = None  # vendor display name; created-or-reused
+    initial_g: float = 1000.0
+    module: ModuleId | None = None
+    location: str | None = None
+
+
+@dataclass(frozen=True)
 class FilamentColor:
     """One filament used by a job: the slicer index + its colour/material + grams used."""
 
