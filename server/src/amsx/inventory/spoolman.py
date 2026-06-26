@@ -19,10 +19,29 @@ log = logging.getLogger("amsx.inventory")
 MODULE_FIELD = "ams_module"
 
 
+def _soft(op: str, exc: Exception) -> None:
+    """Log a SOFT Spoolman failure concisely — one WARNING line, no stack-spam per poll.
+
+    Spoolman being down/flaky/disconnecting is an EXPECTED, handled condition (the inventory is
+    optional), so a full traceback on every poll is noise. The traceback goes to DEBUG for when
+    it's actually wanted.
+    """
+    log.warning("Spoolman %s failed (soft): %s: %s", op, type(exc).__name__, exc)
+    log.debug("Spoolman %s traceback:", op, exc_info=exc)
+
+
 class SpoolmanStore:
     def __init__(self, cfg: SpoolmanConfig) -> None:
         self._cfg = cfg
-        self._client = httpx.AsyncClient(base_url=cfg.base_url, timeout=cfg.timeout)
+        # Disable keep-alive connection REUSE. Spoolman (or anything between us) closes idle
+        # connections, and reusing a server-closed socket raises RemoteProtocolError ("Server
+        # disconnected without sending a response") on the NEXT request. A fresh connection per
+        # request sidesteps it; inventory polling is infrequent, so the overhead is negligible.
+        self._client = httpx.AsyncClient(
+            base_url=cfg.base_url,
+            timeout=cfg.timeout,
+            limits=httpx.Limits(max_keepalive_connections=0),
+        )
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -57,8 +76,8 @@ class SpoolmanStore:
             r = await self._client.get("/spool", params=params)
             r.raise_for_status()
             return [self._spool(j) for j in r.json()]
-        except Exception:  # SOFT
-            log.warning("Spoolman list_spools failed (soft)", exc_info=True)
+        except Exception as exc:  # SOFT
+            _soft("list_spools", exc)
             return []
 
     async def get_spool(self, spool_id: str) -> Spool | None:
@@ -66,8 +85,8 @@ class SpoolmanStore:
             r = await self._client.get(f"/spool/{spool_id}")
             r.raise_for_status()
             return self._spool(r.json())
-        except Exception:
-            log.warning("Spoolman get_spool failed (soft)", exc_info=True)
+        except Exception as exc:
+            _soft("get_spool", exc)
             return None
 
     async def loaded_in(self, module_id: ModuleId) -> Spool | None:
@@ -78,8 +97,8 @@ class SpoolmanStore:
         try:
             r = await self._client.patch(f"/spool/{spool_id}", json=body)
             r.raise_for_status()
-        except Exception:
-            log.warning("Spoolman set_module failed (soft)", exc_info=True)
+        except Exception as exc:
+            _soft("set_module", exc)
 
     async def match(self, material: str | None, color_hex: str | None) -> list[Spool]:
         # Spoolman matches colour perceptually via color_similarity_threshold; we then keep only
@@ -94,8 +113,8 @@ class SpoolmanStore:
             r = await self._client.get("/filament", params=params)
             r.raise_for_status()
             ids = {str(f["id"]) for f in r.json()}
-        except Exception:
-            log.warning("Spoolman match failed (soft)", exc_info=True)
+        except Exception as exc:
+            _soft("match", exc)
             return []
         return [s for s in await self.list_spools() if s.filament_id in ids]
 
@@ -103,8 +122,8 @@ class SpoolmanStore:
         try:
             r = await self._client.put(f"/spool/{spool_id}/use", json={"use_weight": grams})
             r.raise_for_status()
-        except Exception:
-            log.warning("Spoolman consume failed (soft)", exc_info=True)
+        except Exception as exc:
+            _soft("consume", exc)
 
     async def ensure_module_field(self) -> None:
         try:
@@ -117,5 +136,5 @@ class SpoolmanStore:
                 json={"name": "AMS Module", "field_type": "text"},
             )
             post_r.raise_for_status()
-        except Exception:
-            log.warning("Spoolman ensure_module_field failed (soft)", exc_info=True)
+        except Exception as exc:
+            _soft("ensure_module_field", exc)
