@@ -38,12 +38,21 @@ class ModuleConfig(BaseModel):
     spool_ref: str | None = None
 
 
+class SpoolmanConfig(BaseModel):
+    enabled: bool = True
+    base_url: str = "http://localhost:7912/api/v1"
+    # if set, only spools in this Spoolman location are considered "in the AMS"
+    active_location: str | None = None
+    timeout: float = 5.0
+
+
 class Config(BaseModel):
     bus: BusConfig = Field(default_factory=BusConfig)
     printers: list[PrinterConfig] = Field(default_factory=list)
     clusters: list[ClusterConfig] = Field(default_factory=list)
     modules: list[ModuleConfig] = Field(default_factory=list)
     hub: dict = Field(default_factory=dict)
+    spoolman: SpoolmanConfig = Field(default_factory=SpoolmanConfig)
 
     def module_for_filament_index(self, index: int) -> ModuleConfig | None:
         """Config-level mapping used by ModuleRegistry (Spoolman match comes later)."""

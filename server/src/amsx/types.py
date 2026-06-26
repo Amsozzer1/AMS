@@ -79,6 +79,34 @@ class MoveResult:
 
 
 @dataclass(frozen=True)
+class Spool:
+    """One physical spool from the inventory (Spoolman), flattened for the Brain.
+
+    `color_hex` is 6-hex RRGGBB UPPERCASE (no alpha). `module` is which AMS module it's loaded
+    in (from Spoolman's `extra.ams_module`), or None if not loaded.
+    """
+
+    id: str
+    filament_id: str
+    material: str | None = None
+    color_hex: str | None = None
+    name: str | None = None
+    remaining_g: float | None = None
+    module: ModuleId | None = None
+    archived: bool = False
+
+
+@dataclass(frozen=True)
+class FilamentColor:
+    """One filament used by a job: the slicer index + its colour/material + grams used."""
+
+    index: int
+    material: str | None = None
+    color_hex: str | None = None
+    grams: float | None = None
+
+
+@dataclass(frozen=True)
 class PlannedSwap:
     """One material change parsed from the job. `seq` matches the k-th M400 U1 pause.
 
@@ -91,6 +119,8 @@ class PlannedSwap:
     tag: str
     layer: int | None = None
     line: int | None = None  # gcode line of this swap's M400 U1 (the #17 ordinal+line guard)
+    material: str | None = None
+    color_hex: str | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +128,8 @@ class SwapPlan:
     """Ordered material-change plan produced by JobParser; consumed by the Orchestrator."""
 
     swaps: list[PlannedSwap] = field(default_factory=list)
+    base: FilamentColor | None = None
+    colors: list[FilamentColor] = field(default_factory=list)
 
     def __len__(self) -> int:
         return len(self.swaps)
