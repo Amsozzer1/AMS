@@ -194,6 +194,7 @@ class SpoolmanStore:
             (
                 f
                 for f in r.json()
+                # None→"" on both sides so missing-color == missing-color
                 if (_strip_hash(f.get("color_hex")) or "").upper() == (spec_color or "")
                 and (f.get("vendor") or {}).get("id") == vendor_id
                 and f.get("name") == spec.name

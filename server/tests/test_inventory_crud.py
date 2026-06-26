@@ -193,26 +193,14 @@ async def test_spoolman_create_new_vendor_and_filament():
 
 async def test_spoolman_create_reuses_existing_filament():
     """When an exact-matching filament exists, skip POST /filament."""
-    calls = []
+    # No vendor → vendor_id is None; filament has vendor {"id":3} which wouldn't match None,
+    # so use a filament with no vendor for the reuse path.
+    filament_no_vendor = {**FILAMENT_RED, "vendor": None}
+    spool_no_vendor = {**SPOOL_RED, "filament": filament_no_vendor}
+    calls: list = []
 
     def handler(req: httpx.Request) -> httpx.Response:
         calls.append((req.method, req.url.path))
-        if req.method == "GET" and req.url.path.endswith("/filament"):
-            # Return a matching filament
-            return httpx.Response(200, json=[FILAMENT_RED])
-        if req.method == "POST" and req.url.path.endswith("/spool"):
-            body = json.loads(req.content)
-            assert body["filament_id"] == 7
-            return httpx.Response(200, json=SPOOL_RED)
-        raise AssertionError(f"Unexpected request: {req.method} {req.url.path}")
-
-    # No vendor → vendor_id is None; filament has vendor {"id":3} — doesn't match None
-    # So let's use a filament with no vendor for reuse
-    filament_no_vendor = {**FILAMENT_RED, "vendor": None}
-    spool_no_vendor = {**SPOOL_RED, "filament": filament_no_vendor}
-
-    def handler2(req: httpx.Request) -> httpx.Response:
-        calls2.append((req.method, req.url.path))
         if req.method == "GET" and req.url.path.endswith("/filament"):
             return httpx.Response(200, json=[filament_no_vendor])
         if req.method == "POST" and req.url.path.endswith("/spool"):
@@ -221,11 +209,10 @@ async def test_spoolman_create_reuses_existing_filament():
             return httpx.Response(200, json=spool_no_vendor)
         raise AssertionError(f"Unexpected: {req.method} {req.url.path}")
 
-    calls2: list = []
     spec = SpoolSpec(material="PLA", color_hex="FF0000", name="Red")
-    spool = await _store(handler2).create_spool(spec)
+    spool = await _store(handler).create_spool(spec)
 
-    assert ("POST", "/api/v1/filament") not in calls2
+    assert ("POST", "/api/v1/filament") not in calls
     assert spool.id == "42"
 
 
