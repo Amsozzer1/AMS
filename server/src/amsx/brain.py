@@ -202,22 +202,42 @@ class Brain:
 
     async def _bring_up_printers(self) -> None:
         for pc in self.config.printers:
-            link: PrinterLink
-            ftp: FtpClient
             if self.simulate:
-                link = SimulatedPrinterLink(pc.id, pc.serial)
-                ftp = SimulatedFtpClient()
-            else:
-                # PHASE-0: each Bambu printer runs its OWN broker (TLS 8883, access-code auth);
-                # confirm host/port/topic semantics in the v0.2 spike before trusting this path.
-                pbus = MqttBus(host=pc.ip, port=8883)
-                pbus.connect(access_code=pc.access_code)
-                self._printer_buses[pc.id] = pbus
-                link = MqttPrinterLink(pbus, pc.id, pc.serial)
-                ftp = FtpsClient(pc.ip, pc.access_code)
-            printer = Printer(pc.id, link, _make_driver(pc.model), self.events, ftp)
-            await printer.connect()
+                sim_link: PrinterLink = SimulatedPrinterLink(pc.id, pc.serial)
+                sim_ftp: FtpClient = SimulatedFtpClient()
+                printer = Printer(pc.id, sim_link, _make_driver(pc.model), self.events, sim_ftp)
+                await printer.connect()
+                self.printers[pc.id] = printer
+                continue
+
+            # Live: an offline / unreachable printer must NOT abort the whole Brain — the
+            # dashboard and Spoolman inventory don't need it. Register the printer first, then
+            # connect best-effort; on failure log a clear warning and leave it DISCONNECTED (it
+            # shows in the UI as offline; a restart brings it up once it's reachable).
+            # PHASE-0: each Bambu printer runs its OWN broker (TLS 8883, access-code auth).
+            pbus = MqttBus(host=pc.ip, port=8883)
+            self._printer_buses[pc.id] = pbus
+            printer = Printer(
+                pc.id,
+                MqttPrinterLink(pbus, pc.id, pc.serial),
+                _make_driver(pc.model),
+                self.events,
+                FtpsClient(pc.ip, pc.access_code),
+            )
             self.printers[pc.id] = printer
+            try:
+                pbus.connect(access_code=pc.access_code)
+                await printer.connect()
+            except Exception as exc:  # offline printer is non-fatal — boot degraded
+                log.warning(
+                    "Printer %r unreachable at %s:8883 (%s: %s) — started DISCONNECTED. The "
+                    "dashboard and inventory still work; this printer won't be controllable until "
+                    "it's reachable (power it on, confirm LAN mode + IP, then restart the server).",
+                    pc.id,
+                    pc.ip,
+                    type(exc).__name__,
+                    exc,
+                )
 
     # ---- finish handler: consume spool grams on print completion ----
     async def _on_finished(self, event: FinishedEvent) -> None:
