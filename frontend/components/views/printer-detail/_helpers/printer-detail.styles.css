@@ -1,0 +1,157 @@
+/* Styles for this view. Global scope (Next.js only allows plain-CSS imports from
+   layout.tsx) — imported there, colocated here so one view's styles are one file. */
+
+/* =====================================================================
+   Detail view
+   ===================================================================== */
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-sm);
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+.detail-title {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 6px 0 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--s-4) var(--s-5);
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  box-shadow: var(--shadow-card);
+}
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.detail-field-k {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+.detail-field-v {
+  font-size: var(--t-base);
+  font-family: var(--font-mono);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag-sim,
+.tag-warn {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.tag-sim {
+  color: var(--run);
+  background: var(--run-soft);
+}
+.tag-warn {
+  color: var(--warn);
+  background: #f0e7d4;
+}
+
+.hms-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.hms-item {
+  background: var(--fault-soft);
+  border: 1px solid transparent;
+  border-left: 3px solid var(--fault);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: var(--t-sm);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+}
+.hms-item code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* raw JSON tree — ink syntax on paper */
+.raw-tree {
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s-4);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow-x: auto;
+  box-shadow: var(--shadow-card);
+}
+.jt-row {
+  display: flex;
+  gap: 10px;
+  padding: 2px 0;
+  line-height: 1.5;
+}
+.jt-key {
+  color: var(--ink-2);
+}
+.jt-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 0;
+  text-align: left;
+}
+.jt-toggle:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.jt-caret {
+  display: inline-block;
+  width: 12px;
+  color: var(--accent-deep);
+}
+.jt-summary {
+  color: var(--ink-3);
+}
+.jt-children {
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+.jt-null {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.jt-bool {
+  color: var(--warn);
+}
+.jt-num {
+  color: var(--run);
+}
+.jt-str {
+  color: var(--ok);
+  word-break: break-word;
+}
