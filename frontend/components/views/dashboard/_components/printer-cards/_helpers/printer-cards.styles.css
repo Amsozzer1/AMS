@@ -1,0 +1,183 @@
+/* Styles for this view. Global scope (Next.js only allows plain-CSS imports from
+   layout.tsx) — imported there, colocated here so one view's styles are one file. */
+
+/* =====================================================================
+   Printer cards — instrument readouts on paper
+   ===================================================================== */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--s-4);
+}
+
+.card {
+  position: relative;
+  display: block;
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  color: inherit;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card-link:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-raise);
+}
+.card.attn {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-card);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+.card-head .pid {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-lg);
+  letter-spacing: -0.015em;
+}
+
+/* stage badge — flat tinted chip by state */
+.stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--paper-inset);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.stage-badge .sdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.stage-run {
+  color: var(--run);
+  background: var(--run-soft);
+  border-color: transparent;
+}
+.stage-act {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+.stage-fault {
+  color: var(--fault);
+  background: var(--fault-soft);
+  border-color: transparent;
+}
+.stage-idle {
+  color: var(--ink-3);
+}
+
+.telemetry {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: 8px 0;
+  font-size: var(--t-sm);
+  border-bottom: 1px solid var(--line);
+}
+.row:last-child {
+  border-bottom: none;
+}
+.row .k {
+  color: var(--ink-2);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.row .v {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  text-align: right;
+}
+
+.sensor-on {
+  color: var(--ok);
+  font-weight: 700;
+}
+.sensor-off {
+  color: var(--ink-3);
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 7px;
+  border: 1px solid rgba(27, 26, 23, 0.25);
+  vertical-align: middle;
+}
+.swatch-lg {
+  width: 18px;
+  height: 18px;
+}
+
+/* progress bar — flat ink fill, sunken trough */
+.progress-wrap {
+  margin-top: var(--s-4);
+}
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+  margin-bottom: 6px;
+  letter-spacing: 0.04em;
+}
+.progress-meta .pct {
+  color: var(--run);
+  font-weight: 700;
+}
+.progress {
+  height: 7px;
+  background: var(--paper-sunken);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--run);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--s-4);
+  font-size: var(--t-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+}
