@@ -1,0 +1,20 @@
+{
+  // Point the Python tooling at the server's uv-managed venv.
+  "python.defaultInterpreterPath": "${workspaceFolder}/server/.venv/bin/python",
+  "python.analysis.extraPaths": ["${workspaceFolder}/server/src"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["server/tests"],
+
+  // Ruff is the formatter + linter for the server (see pyproject.toml).
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": { "source.organizeImports": "explicit" }
+  },
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.ruff_cache": true,
+    "**/.pytest_cache": true
+  }
+}

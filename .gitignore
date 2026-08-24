@@ -53,6 +53,9 @@ id_rsa*
 .DS_Store
 
 # ---- Local tool settings ----
+# The Claude Code project config IS tracked (rules + subagents must travel between machines).
+# Only the machine-local permission grants are ignored. NOTE: `.claude` itself must never be
+# ignored — git cannot re-include a file whose parent directory is excluded.
 .claude/settings.local.json
 
 # ---- Media (large generated assets) ----
@@ -62,8 +65,11 @@ docs/media/*.png
 docs/media/*.jpg
 docs/media/*.jpeg
 !docs/media/README.md
-.claude
-.vscode
-CLAUDE.md
-tmp
-spoolman
+# ---- Machine-local scratch & vendored third-party (never committed) ----
+# tmp/      local .gcode.3mf test blobs
+# spoolman/ vendored upstream clone; run it as a container instead (deploy/docker-compose.yml)
+tmp/
+spoolman/
+
+# Generated API schema (regenerate with: uv run python server/scripts/dump_openapi.py)
+server/openapi.json
