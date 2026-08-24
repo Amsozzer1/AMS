@@ -2,12 +2,13 @@
   "name": "amsx-frontend",
   "version": "0.0.0",
   "private": true,
-  "description": "AMS-X operator UI — live printer dashboard, 3MF upload, and the human-swap prompt loop.",
+  "description": "AMS-X operator UI \u2014 live printer dashboard, 3MF upload, and the human-swap prompt loop.",
   "scripts": {
     "dev": "next dev -p 9000",
     "build": "next build",
     "start": "next start -p 9000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "gen:api": "../server/.venv/bin/python ../server/scripts/dump_openapi.py && openapi-typescript ../server/openapi.json -o api/types.generated.ts"
   },
   "dependencies": {
     "next": "15.5.19",
@@ -20,6 +21,7 @@
     "@types/react-dom": "19.1.6",
     "eslint": "9.18.0",
     "eslint-config-next": "15.5.19",
+    "openapi-typescript": "^7.13.0",
     "typescript": "5.7.3"
   }
 }

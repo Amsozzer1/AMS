@@ -1,0 +1,124 @@
+{
+  // Opening this folder auto-runs "Dev: All" (backend + frontend), both with hot-reload.
+  // VS Code asks once to "Allow Automatic Tasks" — choose Allow.
+  // Run manually any time: Terminal > Run Task… or Ctrl/Cmd+Shift+P "Tasks: Run Task".
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev: All",
+      "detail": "Run the Brain against the REAL A1 mini (hot-reload) + operator UI (Fast Refresh) together. Needs the printer powered on and on the LAN.",
+      "dependsOrder": "parallel",
+      "dependsOn": ["Backend: Brain (real printer, watch)", "Frontend: Next dev"],
+      "runOptions": { "runOn": "folderOpen" },
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "Backend: Brain (simulate, watch)",
+      "detail": "uv sync, then run the FastAPI Brain on :9001 in simulate mode, watching src/ for changes (no printer needed; drives the v0 sim hooks).",
+      "type": "shell",
+      "command": "uv sync --extra dev && uv run amsx",
+      "options": {
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "AMSX_SIMULATE": "1",
+          "AMSX_RELOAD": "1",
+          "AMSX_CONFIG": "config/ams.sim.yaml",
+          "AMSX_HOST": "127.0.0.1",
+          "AMSX_PORT": "9001",
+          "AMSX_CORS_ORIGINS": "http://localhost:9000,http://127.0.0.1:9000"
+        }
+      },
+      "isBackground": true,
+      "presentation": {
+        "group": "dev",
+        "panel": "dedicated",
+        "reveal": "always",
+        "clear": true
+      },
+      "problemMatcher": {
+        "pattern": [{ "regexp": ".", "file": 1, "location": 2, "message": 3 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*Started server process.*|.*Will watch.*|.*uv sync.*",
+          "endsPattern": ".*Uvicorn running on.*|.*Application startup complete.*"
+        }
+      }
+    },
+    {
+      "label": "Backend: Brain (real printer, watch)",
+      "detail": "Run the Brain on :9001 against the REAL A1 mini (ams.local.yaml) with hot-reload. Needs the printer on the LAN. Holds the printer's MQTT connection — stop this before running the change-routine spike (only one MQTT client at a time).",
+      "type": "shell",
+      "command": "uv sync --extra dev && uv run amsx",
+      "options": {
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "AMSX_SIMULATE": "0",
+          "AMSX_RELOAD": "1",
+          "AMSX_CONFIG": "config/ams.local.yaml",
+          "AMSX_HOST": "127.0.0.1",
+          "AMSX_PORT": "9001",
+          "AMSX_CORS_ORIGINS": "http://localhost:9000,http://127.0.0.1:9000"
+        }
+      },
+      "isBackground": true,
+      "presentation": {
+        "group": "dev",
+        "panel": "dedicated",
+        "reveal": "always",
+        "clear": true
+      },
+      "problemMatcher": {
+        "pattern": [{ "regexp": ".", "file": 1, "location": 2, "message": 3 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*Started server process.*|.*Will watch.*|.*uv sync.*",
+          "endsPattern": ".*Uvicorn running on.*|.*Application startup complete.*"
+        }
+      }
+    },
+    {
+      "label": "Frontend: Next dev",
+      "detail": "npm install (if needed), then run the Next.js operator UI on :9000 with Fast Refresh (talks to the Brain on :9001).",
+      "type": "shell",
+      "command": "npm install && npm run dev -- -p 9000",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend",
+        "env": { "NEXT_PUBLIC_API_BASE": "http://127.0.0.1:9001" }
+      },
+      "isBackground": true,
+      "presentation": {
+        "group": "dev",
+        "panel": "dedicated",
+        "reveal": "always",
+        "clear": true
+      },
+      "problemMatcher": {
+        "pattern": [{ "regexp": ".", "file": 1, "location": 2, "message": 3 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*(npm install|Starting|compiling).*",
+          "endsPattern": ".*(Ready in|Local:\\s+http|compiled).*"
+        }
+      }
+    },
+    {
+      "label": "Test: Backend (pytest)",
+      "detail": "Run the server test suite.",
+      "type": "shell",
+      "command": "uv run pytest -q",
+      "options": { "cwd": "${workspaceFolder}/server" },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: v0 API (live)",
+      "detail": "Drive the running Brain on :9001 end to end (the money shot). Start 'Dev: All' first.",
+      "type": "shell",
+      "command": "uv run python scripts/test_v0_api.py --base http://127.0.0.1:9001",
+      "options": { "cwd": "${workspaceFolder}/server" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

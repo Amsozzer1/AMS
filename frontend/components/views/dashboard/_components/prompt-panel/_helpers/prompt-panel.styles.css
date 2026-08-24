@@ -1,0 +1,219 @@
+/* Styles for this view. Global scope (Next.js only allows plain-CSS imports from
+   layout.tsx) — imported there, colocated here so one view's styles are one file. */
+
+/* =====================================================================
+   THE HERO — Work Order (pending human-swap prompt)
+   The signature element. On the calm paper page it becomes a bold, flat
+   vermilion action placard — drama through contrast + scale, not glow.
+   ===================================================================== */
+
+.action-console {
+  position: relative;
+  margin-bottom: var(--s-6);
+}
+
+/* idle / standby — a quiet ruled card; says nothing is pending */
+.console-idle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius-lg);
+  background: var(--paper-card);
+  padding: var(--s-4) var(--s-5);
+  color: var(--ink-2);
+  font-size: var(--t-base);
+  box-shadow: var(--shadow-card);
+}
+.console-idle .standby-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex-shrink: 0;
+}
+.console-idle .err {
+  color: var(--fault);
+}
+
+/* active — solid vermilion work-order placard */
+.console-active {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--accent);
+  color: var(--accent-on);
+  box-shadow: var(--shadow-raise);
+  animation: console-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* hazard stripe across the very top — flat, restrained */
+.console-active .beacon {
+  height: 6px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--accent-deep) 0 11px,
+    transparent 11px 22px
+  );
+  background-size: 31px 31px;
+  animation: beacon-slide 1.4s linear infinite;
+}
+
+.console-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-5) 0;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-on);
+  font-weight: 700;
+  opacity: 0.92;
+}
+.console-banner .pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-on);
+  animation: pulse-dot 1.3s ease-in-out infinite;
+}
+
+.prompt-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5) var(--s-5);
+}
+
+.prompt-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  flex-wrap: wrap;
+}
+
+/* big module callout — the physical address the operator walks to */
+.module-callout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 128px;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius);
+  background: rgba(27, 12, 6, 0.22);
+  border: 1px solid rgba(253, 243, 238, 0.25);
+}
+.module-callout .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-on);
+  opacity: 0.8;
+}
+.module-callout .id {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--t-4xl);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--accent-on);
+}
+
+.prompt-body {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.prompt-body .instruction {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  color: var(--accent-on);
+  margin: 0 0 6px;
+}
+.prompt-body .sub {
+  font-size: var(--t-sm);
+  color: var(--accent-on);
+  opacity: 0.78;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* hold-to-confirm — a dark ink bar on the placard that fills as you hold */
+.confirm-btn {
+  position: relative;
+  flex-shrink: 0;
+  min-width: 224px;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--paper-card);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--t-md);
+  box-shadow: 0 6px 18px -8px rgba(27, 12, 6, 0.6);
+  transition: transform 0.08s ease;
+}
+.confirm-btn:active {
+  transform: translateY(1px);
+}
+.confirm-btn:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+.confirm-btn .confirm-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ok);
+  transform-origin: left center;
+  transform: scaleX(0);
+  z-index: 0;
+}
+.confirm-btn.holding .confirm-fill {
+  transition: transform 0.62s linear;
+  transform: scaleX(1);
+}
+.confirm-btn .confirm-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: 16px 24px;
+  letter-spacing: 0.01em;
+}
+.confirm-btn.done {
+  background: var(--ok);
+  color: var(--accent-on);
+}
+
+.confirm-hint {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-on);
+  opacity: 0.66;
+  text-align: center;
+  margin-top: var(--s-2);
+}
+
+.console-error {
+  margin: 0 var(--s-5) var(--s-4);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(27, 12, 6, 0.2);
+  border: 1px solid rgba(253, 243, 238, 0.3);
+  color: var(--accent-on);
+  font-size: var(--t-sm);
+  font-family: var(--font-mono);
+}

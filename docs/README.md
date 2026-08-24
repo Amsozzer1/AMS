@@ -31,6 +31,23 @@ inventory.
 | [09-filament-change-protocol.md](09-filament-change-protocol.md) | How multicolor-no-AMS slicing works, the gcode encoding, and how #17 is resolved |
 | [10-domain-model.md](10-domain-model.md) | The server's class/domain model — Brain, Printer, Job, Module, Orchestrator |
 
+## Working rules
+
+The rules Claude operates under. Indexed from [CLAUDE.md](../CLAUDE.md), loaded every session.
+
+| Rule | What it covers |
+|-----|----------------|
+| [rules/00-user-decides.md](rules/00-user-decides.md) | ⛔ The user decides, Claude builds — nothing is acted on without explicit approval |
+| [rules/01-separation-of-concerns.md](rules/01-separation-of-concerns.md) | ⛔ One job per file; depend on seams so decisions stay reversible |
+| [rules/02-stubs.md](rules/02-stubs.md) | Unfinished work carries `@todo`, never a hand-written `NotImplementedError` |
+
+## Frontend
+
+| Doc | What it covers |
+|-----|----------------|
+| [frontend/00-architecture.md](frontend/00-architecture.md) | Folder architecture — views, `_components`, `_helpers`, the index-as-door rule |
+| [frontend/01-api-layer.md](frontend/01-api-layer.md) | The `api/` module, the transport seam, and generated types |
+
 ## Locked decisions (so far)
 
 1. **Target printers:** X1/P1 **and** A1 — via a printer-abstraction layer. X1/P1 first.
