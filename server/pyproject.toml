@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.7",
+    "import-linter>=2.0",      # RULE 1 — fails CI on a sideways/upward import
     "ty>=0.0.1a1",             # Astral type checker (preview)
     "pytest>=8.3",
     "pytest-asyncio>=0.24",    # orchestrator is async
@@ -58,3 +59,33 @@ addopts = "-ra"
 [tool.ty]
 
 # defaults are fine for now; src layout is auto-detected
+
+# ---- import-linter: RULE 1 enforced mechanically (docs/rules/01-separation-of-concerns.md) ----
+# The layering was previously guarded only by review. This makes a violation fail, so the rule
+# survives a tired evening, a new contributor, and any model.
+[tool.importlinter]
+root_package = "amsx"
+
+[[tool.importlinter.contracts]]
+name = "amsx layers: nothing imports upward"
+type = "layers"
+layers = [
+    "amsx.api",
+    "amsx.brain",
+    "amsx.orchestration",
+    "amsx.printer",
+    "amsx.transport | amsx.job | amsx.module | amsx.inventory",
+    "amsx.protocols | amsx.events",
+    "amsx.types | amsx.utils | amsx.config",
+]
+
+[[tool.importlinter.contracts]]
+name = "the kernel stays dependency-free"
+type = "independence"
+modules = ["amsx.types", "amsx.utils", "amsx.config"]
+
+[[tool.importlinter.contracts]]
+name = "orchestration depends on seams, never on concrete implementations"
+type = "forbidden"
+source_modules = ["amsx.orchestration"]
+forbidden_modules = ["amsx.printer", "amsx.transport", "amsx.brain", "amsx.api"]
