@@ -13,61 +13,45 @@ import tempfile
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 from ..brain import Brain, build_brain
 from ..events import PauseEvent, SensorEvent
 from ..orchestration import Orchestrator
 from ..printer import Printer
-from ..types import PauseReason, Spool, SpoolSpec
-
-
-class SpoolCreate(BaseModel):
-    """Request body for POST /api/spools."""
-
-    material: str
-    color_hex: str | None = None
-    name: str | None = None
-    vendor: str | None = None
-    initial_g: float = 1000.0
-    module: str | None = None
-    location: str | None = None
-
-
-class SpoolUpdate(BaseModel):
-    """Request body for PATCH /api/spools/{spool_id}."""
-
-    remaining_g: float | None = None
-    location: str | None = None
-    archived: bool | None = None
-
+from ..types import PauseReason, SpoolSpec
+from .models import (
+    AnswerResult,
+    AssignmentResponse,
+    AssignRow,
+    DeleteResult,
+    Health,
+    JobResult,
+    LoadoutRow,
+    ModuleInfo,
+    OkResponse,
+    OrchestratorArmed,
+    OrchestratorIdle,
+    OrchestratorStatus,
+    PlannedSwap,
+    PrinterDetail,
+    PrinterState,
+    Prompt,
+    SimPauseResult,
+    SimSensorResult,
+    Spool,
+    SpoolCreate,
+    SpoolUpdate,
+    StartArmedResult,
+)
 
 log = logging.getLogger("amsx.api")
 
 # Local-first dev: the SPA is served from a different port, so allow the dev origins.
 # Override with AMSX_CORS_ORIGINS (comma-separated) when serving from elsewhere.
 _DEFAULT_CORS = "http://localhost:3000,http://127.0.0.1:3000"
-
-
-def _printer_state(printer: Printer) -> dict[str, Any]:
-    s = printer.state
-    loaded = s.loaded_filament
-    return {
-        "id": printer.id,
-        "stage": str(s.stage),
-        "pause_reason": str(s.pause_reason) if s.pause_reason is not None else None,
-        "filament_sensor": s.filament_sensor,
-        "progress": s.progress,
-        "loaded_filament": (
-            {"index": loaded.index, "material": loaded.material, "color": loaded.color}
-            if loaded is not None
-            else None
-        ),
-    }
 
 
 def _is_connected(printer: Printer) -> bool:
@@ -78,47 +62,23 @@ def _is_connected(printer: Printer) -> bool:
     return bool(getattr(bus, "connected", False))
 
 
-def _printer_detail(brain: Brain, printer: Printer) -> dict[str, Any]:
+def _printer_detail(brain: Brain, printer: Printer) -> PrinterDetail:
     """Everything we know about one printer: modeled state + identity + the full raw report.
 
-    ``raw`` is the deep-merged snapshot of the printer's own report (temps, fans, wifi, ams,
-    speeds, ipcam, etc.) — the complete picture for a detail view. The access code is never
-    included.
+    Composed here rather than on the model because it draws on two sources (the live Printer
+    and the Brain's config). The access code is never included.
     """
     cfg = next((p for p in brain.config.printers if p.id == printer.id), None)
-    return {
-        **_printer_state(printer),
-        "serial": cfg.serial if cfg else printer.link.serial,
-        "model": cfg.model if cfg else printer.driver.model,
-        "ip": cfg.ip if cfg else None,
-        "simulate": brain.simulate,
-        "connected": _is_connected(printer),
-        "seeded": printer._seeded,
-        "raw": printer.state.raw,
-    }
-
-
-def _orchestrator_status(orch: Orchestrator) -> dict[str, Any]:
-    """The live swap loop's state — what the dashboard (and the v0 test script) watch."""
-    return {
-        "armed": True,
-        "printer_id": orch.printer_id,
-        "cursor": orch.cursor,
-        "total": len(orch.plan),
-        "done": orch.done,
-        "held": orch.held,
-        "swap_state": str(orch.sm.state),
-        "alerts": list(orch.alerts),
-        "swaps": [
-            {
-                "seq": sw.seq,
-                "filament_index": sw.filament_index,
-                "tag": sw.tag,
-                "current": i == orch.cursor,
-            }
-            for i, sw in enumerate(orch.plan.swaps)
-        ],
-    }
+    return PrinterDetail(
+        **PrinterState.from_printer(printer).model_dump(),
+        serial=cfg.serial if cfg else printer.link.serial,
+        model=cfg.model if cfg else printer.driver.model,
+        ip=cfg.ip if cfg else None,
+        simulate=brain.simulate,
+        connected=_is_connected(printer),
+        seeded=printer._seeded,
+        raw=printer.state.raw,
+    )
 
 
 def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
@@ -154,28 +114,28 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
     _bg_tasks: set[asyncio.Task] = set()
 
     @app.get("/health")
-    async def health() -> dict[str, Any]:
+    async def health() -> Health:
         b = _brain()
-        return {
-            "ok": True,
-            "simulate": b.simulate,
-            "printers": list(b.printers),
-            "modules": len(b._module_by_id),
-        }
+        return Health(
+            ok=True,
+            simulate=b.simulate,
+            printers=list(b.printers),
+            modules=len(b._module_by_id),
+        )
 
     @app.get("/api/printers")
-    async def list_printers() -> list[dict[str, Any]]:
-        return [_printer_state(p) for p in _brain().printers.values()]
+    async def list_printers() -> list[PrinterState]:
+        return [PrinterState.from_printer(p) for p in _brain().printers.values()]
 
     @app.get("/api/printers/{printer_id}")
-    async def get_printer(printer_id: str) -> dict[str, Any]:
+    async def get_printer(printer_id: str) -> PrinterState:
         printer = _brain().printers.get(printer_id)
         if printer is None:
             raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
-        return _printer_state(printer)
+        return PrinterState.from_printer(printer)
 
     @app.get("/api/printers/{printer_id}/detail")
-    async def get_printer_detail(printer_id: str) -> dict[str, Any]:
+    async def get_printer_detail(printer_id: str) -> PrinterDetail:
         """Full per-printer view (modeled state + identity + complete raw report)."""
         b = _brain()
         printer = b.printers.get(printer_id)
@@ -184,7 +144,7 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         return _printer_detail(b, printer)
 
     @app.post("/api/printers/{printer_id}/job")
-    async def submit_job(printer_id: str, file: UploadFile, start: bool = True) -> dict[str, Any]:
+    async def submit_job(printer_id: str, file: UploadFile, start: bool = True) -> JobResult:
         """Upload a sliced 3MF and arm the swap plan.
 
         ``start=true`` (default) also pushes (FTPS) + starts the print — the still-unverified
@@ -212,18 +172,18 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             log.exception("API: job submit FAILED for %s", printer_id)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         log.info("API: job accepted for %s (started=%s)", printer_id, start)
-        return {
-            "printer_id": printer_id,
-            "filename": file.filename,
-            "started": start,
-            "planned_swaps": [
-                {"seq": sw.seq, "filament_index": sw.filament_index, "tag": sw.tag}
+        return JobResult(
+            printer_id=printer_id,
+            filename=file.filename,
+            started=start,
+            planned_swaps=[
+                PlannedSwap(seq=sw.seq, filament_index=sw.filament_index, tag=sw.tag)
                 for sw in orch.plan.swaps
             ],
-        }
+        )
 
     @app.post("/api/printers/{printer_id}/job/start")
-    async def start_armed_job(printer_id: str) -> dict[str, Any]:
+    async def start_armed_job(printer_id: str) -> StartArmedResult:
         """Push (FTPS) + start the job this printer is ALREADY armed with.
 
         The two-step flow: upload with ``?start=false`` to arm + propose the mapping, let the
@@ -241,21 +201,21 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             log.exception("API: start_armed FAILED for %s", printer_id)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         log.info("API: armed job started for %s", printer_id)
-        return {"printer_id": printer_id, "started": True}
+        return StartArmedResult(printer_id=printer_id, started=True)
 
     @app.get("/api/prompts")
-    async def list_prompts() -> list[dict[str, Any]]:
+    async def list_prompts() -> list[Prompt]:
         """Pending human-swap actions the orchestrator is waiting on."""
-        return _brain().prompts.pending()
+        return [Prompt(**p) for p in _brain().prompts.pending()]
 
     @app.post("/api/prompts/{prompt_id}/answer")
-    async def answer_prompt(prompt_id: str, response: str = "done") -> dict[str, Any]:
+    async def answer_prompt(prompt_id: str, response: str = "done") -> AnswerResult:
         if not _brain().prompts.answer(prompt_id, response):
             raise HTTPException(status_code=404, detail=f"unknown prompt {prompt_id!r}")
-        return {"ok": True, "prompt_id": prompt_id}
+        return AnswerResult(ok=True, prompt_id=prompt_id)
 
     @app.get("/api/printers/{printer_id}/orchestrator")
-    async def get_orchestrator(printer_id: str) -> dict[str, Any]:
+    async def get_orchestrator(printer_id: str) -> OrchestratorStatus:
         """The armed swap loop for this printer (cursor / held / swap_state / alerts).
 
         404 if the printer is unknown; ``{"armed": false}`` if no job has been submitted yet.
@@ -265,32 +225,20 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
         orch = b.orchestrators.get(printer_id)
         if orch is None:
-            return {"armed": False, "printer_id": printer_id}
-        return _orchestrator_status(orch)
+            return OrchestratorIdle(printer_id=printer_id)
+        return OrchestratorArmed.from_orchestrator(orch)
 
     # ---- spool inventory proxy endpoints ------------------------------------------------
-    def _spool_dict(s: Spool) -> dict[str, Any]:
-        return {
-            "id": s.id,
-            "filament_id": s.filament_id,
-            "material": s.material,
-            "color_hex": s.color_hex,
-            "name": s.name,
-            "remaining_g": s.remaining_g,
-            "module": s.module,
-            "archived": s.archived,
-        }
-
     @app.get("/api/modules")
-    async def list_modules() -> list[dict[str, Any]]:
+    async def list_modules() -> list[ModuleInfo]:
         """All configured AMS modules (for the add-spool form module dropdown)."""
         return [
-            {"id": mc.id, "cluster_id": mc.cluster_id, "filament_index": mc.filament_index}
+            ModuleInfo(id=mc.id, cluster_id=mc.cluster_id, filament_index=mc.filament_index)
             for mc in _brain().config.modules
         ]
 
     @app.post("/api/spools")
-    async def create_spool(body: SpoolCreate) -> dict[str, Any]:
+    async def create_spool(body: SpoolCreate) -> Spool:
         """Create a new spool in the inventory."""
         spec = SpoolSpec(
             material=body.material,
@@ -306,10 +254,10 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         except Exception as exc:
             log.exception("API: create_spool FAILED")
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-        return _spool_dict(spool)
+        return Spool.from_domain(spool)
 
     @app.patch("/api/spools/{spool_id}")
-    async def update_spool(spool_id: str, body: SpoolUpdate) -> dict[str, Any]:
+    async def update_spool(spool_id: str, body: SpoolUpdate) -> Spool:
         """Update weight, location, or archived status of a spool."""
         try:
             spool = await _brain().store.update_spool(
@@ -323,10 +271,10 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         except Exception as exc:
             log.exception("API: update_spool FAILED for %s", spool_id)
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-        return _spool_dict(spool)
+        return Spool.from_domain(spool)
 
     @app.delete("/api/spools/{spool_id}")
-    async def delete_spool(spool_id: str) -> dict[str, Any]:
+    async def delete_spool(spool_id: str) -> DeleteResult:
         """Hard-delete a spool from the inventory."""
         try:
             await _brain().store.delete_spool(spool_id)
@@ -337,16 +285,16 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         # Success return is outside the try — the dict can't raise, so it doesn't belong
         # under the error guard.
-        return {"ok": True, "id": spool_id}
+        return DeleteResult(ok=True, id=spool_id)
 
     @app.get("/api/spools")
-    async def list_spools(include_archived: bool = False) -> list[dict[str, Any]]:
+    async def list_spools(include_archived: bool = False) -> list[Spool]:
         """List all spools from the inventory (Spoolman or fake)."""
         spools = await _brain().store.list_spools(include_archived=include_archived)
-        return [_spool_dict(s) for s in spools]
+        return [Spool.from_domain(s) for s in spools]
 
     @app.get("/api/printers/{printer_id}/loadout")
-    async def get_loadout(printer_id: str) -> list[dict[str, Any]]:
+    async def get_loadout(printer_id: str) -> list[LoadoutRow]:
         """Current spool→module mapping for every configured module on this printer."""
         b = _brain()
         if printer_id not in b.printers:
@@ -354,20 +302,20 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         rows = []
         for mc in b.config.modules:
             spool = await b.store.loaded_in(mc.id)
-            rows.append({"module": mc.id, "spool": _spool_dict(spool) if spool else None})
+            rows.append(LoadoutRow(module=mc.id, spool=Spool.from_domain(spool) if spool else None))
         return rows
 
     @app.put("/api/printers/{printer_id}/loadout")
-    async def set_loadout(printer_id: str, module: str, spool_id: str) -> dict[str, Any]:
+    async def set_loadout(printer_id: str, module: str, spool_id: str) -> OkResponse:
         """Assign a spool to a module (writes `set_module` on the store)."""
         b = _brain()
         if printer_id not in b.printers:
             raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
         await b.store.set_module(spool_id, module)
-        return {"ok": True}
+        return OkResponse(ok=True)
 
     @app.get("/api/printers/{printer_id}/job/assignment")
-    async def get_assignment(printer_id: str) -> dict[str, Any]:
+    async def get_assignment(printer_id: str) -> AssignmentResponse:
         """Current spool-assignment proposal for the armed job on this printer.
 
         Returns rows (one per filament index from the plan), each with the module/spool the
@@ -378,23 +326,11 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         if printer_id not in b.printers:
             raise HTTPException(status_code=404, detail=f"unknown printer {printer_id!r}")
         proposal = b.assignment.get(printer_id, {})
-        rows = []
-        for _idx, row in sorted(proposal.items()):
-            rows.append(
-                {
-                    "index": row.index,
-                    "material": row.material,
-                    "color_hex": row.color_hex,
-                    "grams": row.grams,
-                    "module": row.module,
-                    "spool_id": row.spool_id,
-                    "status": row.status,
-                }
-            )
-        return {"rows": rows, "confirmed": printer_id in b.confirmed}
+        rows = [AssignRow.from_proposed(row) for _idx, row in sorted(proposal.items())]
+        return AssignmentResponse(rows=rows, confirmed=printer_id in b.confirmed)
 
     @app.post("/api/printers/{printer_id}/job/assignment")
-    async def confirm_assignment(printer_id: str, body: dict[str, str]) -> dict[str, Any]:
+    async def confirm_assignment(printer_id: str, body: dict[str, str]) -> OkResponse:
         """Confirm (and optionally override) the index→module mapping.
 
         Body: `{index: module_id}` for each filament index. Persists each override into
@@ -428,7 +364,7 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
                             exc_info=True,
                         )
         b.confirmed.add(printer_id)
-        return {"ok": True}
+        return OkResponse(ok=True)
 
     # ---- simulate-only test hooks --------------------------------------------------------
     # These let a client drive the swap loop without a printer: inject the pause the
@@ -455,7 +391,7 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
     @app.post("/api/printers/{printer_id}/sim/pause")
     async def sim_pause(
         printer_id: str, tag: str | None = None, line: int | None = None
-    ) -> dict[str, Any]:
+    ) -> SimPauseResult:
         """Inject a filament-change pause (simulate mode only).
 
         Default (no params): an UNTAGGED pause carrying the next expected swap's gcode ``line`` —
@@ -469,7 +405,7 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         orch = _armed_orchestrator(b, printer_id)
         if tag is not None:
             event = PauseEvent(printer_id=printer_id, reason=PauseReason.CHANGE, tag=tag)
-            injected: dict[str, Any] = {"tag": tag}
+            injected = SimPauseResult(printer_id=printer_id, tag=tag)
         else:
             if line is None:
                 if orch.done:
@@ -482,16 +418,16 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             event = PauseEvent(
                 printer_id=printer_id, reason=PauseReason.UNKNOWN, tag=None, line=line
             )
-            injected = {"line": line}
+            injected = SimPauseResult(printer_id=printer_id, line=line)
         # Don't await: on_pause runs the whole swap, which blocks on the human prompt. Fire it
         # onto the loop and return so the client can answer prompts + trip the sensor.
         task = asyncio.create_task(b.events.publish(event))
         _bg_tasks.add(task)
         task.add_done_callback(_bg_tasks.discard)
-        return {"injected": "pause", "printer_id": printer_id, **injected}
+        return injected
 
     @app.post("/api/printers/{printer_id}/sim/sensor")
-    async def sim_sensor(printer_id: str, present: bool = True) -> dict[str, Any]:
+    async def sim_sensor(printer_id: str, present: bool = True) -> SimSensorResult:
         """Trip (or clear) the printer's filament-present sensor (simulate mode only).
 
         Publishes a ``SensorEvent`` — the signal that closes the orchestrator's SENSING loop.
@@ -501,6 +437,6 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         _require_sim(b)
         _armed_orchestrator(b, printer_id)
         await b.events.publish(SensorEvent(printer_id=printer_id, filament_present=present))
-        return {"injected": "sensor", "printer_id": printer_id, "filament_present": present}
+        return SimSensorResult(printer_id=printer_id, filament_present=present)
 
     return app
