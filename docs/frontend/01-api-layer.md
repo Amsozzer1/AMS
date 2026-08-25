@@ -25,8 +25,9 @@ moves. That reversibility is the reason for the layering, not incidental to it.
 
 ## Types are generated, never written
 
-`server/src/amsx/api/models.py` is the single source of truth. Types reach TypeScript by
-generation, so they cannot drift from what the server actually sends.
+Each app's `view.py` under `server/amsx/apps/` is the single source of truth (plus
+`server/amsx/system/infra/http/view.py` for the shapes that belong to no one app). Types reach
+TypeScript by generation, so they cannot drift from what the server actually sends.
 
 ```bash
 cd frontend && npm run gen:api

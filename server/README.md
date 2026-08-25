@@ -3,21 +3,25 @@
 Python app that automates the Bambu external-spool swap over MQTT. Package layout mirrors the
 domain model in [../docs/10-domain-model.md](../docs/10-domain-model.md).
 
-## Package layout (`src/amsx/`)
-| Package | Holds (per docs/10) |
-|---|---|
-| `config/` | `Config` loading (printers, clusters, modules, hub) |
-| `transport/` | `MqttBus`, `PrinterLink`, `ClusterLink`, `FtpClient` |
-| `printer/` | `Printer`, `PrinterState`; `printer/drivers/` → `PrinterDriver`, `X1P1Driver`, `A1Driver` |
-| `job/` | `Job`, `JobParser`, `SwapPlan`, `PlannedSwap` |
-| `module/` | `Module` (Manual/Hardware), `Cluster`, `ModuleRegistry` |
-| `orchestration/` | `Orchestrator`, `SwapStateMachine`, `SwapContext` — the only sentient part |
-| `inventory/` | `Spool`, `SpoolmanClient` (Phase 4) |
-| `api/` | FastAPI app + websockets |
+## Package layout (`amsx/`)
 
-> Nothing is implemented yet — these are empty packages. Build order follows
-> [../docs/07-v0-plan.md](../docs/07-v0-plan.md) (v0.1 transport → v0.3 printer state →
-> v0.4 job → v0.5 module → v0.6 orchestrator).
+Read top to bottom: each layer may import anything below it and nothing above it. That rule is
+enforced by `import-linter`, not by review — see [../docs/rules/01-separation-of-concerns.md](../docs/rules/01-separation-of-concerns.md).
+
+| Package | Holds |
+|---|---|
+| `system/` | Where the app runs: `brain.py` (composition root), `__main__.py`, `middlewares/` (the `Depends` providers), and `infra/` — the adapters, by protocol: `http/`, `mqtt/`, `ftps/` |
+| `routes/` | One module per resource, each an `APIRouter`. Mounted by `system/infra/http/app.py` |
+| `apps/` | The domain. Each app is `service.py` (logic) + `view.py` (its wire shapes): `printer/` (+ `drivers.py`), `orchestration/` (the only sentient part), `job/`, `module/`, `inventory/`, `prompt/` |
+| `libs/` | Third-party clients — `spoolman/` |
+| `events/` | `EventBus` and the typed event payloads |
+| `types/` | Value objects, ids, wire shapes, and `protocols.py` — **every swappable seam, in one file** |
+| `enums/` | The four `StrEnum`s: `PrinterStage`, `PauseReason`, `ModuleState`, `SwapState` |
+| `errors/` | Domain exceptions and the HTTP error classes that carry their own status codes |
+| `config/` | `Config` loading (printers, clusters, modules, hub) from `ams.json` |
+| `utils/` | The `@todo` decorator (RULE 2) |
+
+Build order follows [../docs/07-v0-plan.md](../docs/07-v0-plan.md).
 
 ## Dev setup (toolchain: uv + Ruff + ty + pytest)
 ```bash
@@ -29,4 +33,4 @@ uv run pytest            # tests
 ```
 
 Copy `config/ams.example.json` → `config/ams.local.json` and fill in your printer serial +
-access code (LAN mode). `*.local.yaml` is gitignored — never commit real access codes.
+access code (LAN mode). `*.local.json` is gitignored — never commit real access codes.

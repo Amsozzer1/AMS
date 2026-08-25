@@ -27,8 +27,8 @@ up correctly and the library stops being a commitment.
 
 ## The worked example — this repo already does it right
 
-`server/src/amsx/protocols.py` is the model to follow. The Orchestrator imports **zero**
-concrete classes — only these seams:
+`server/amsx/types/protocols.py` is the model to follow — every swappable seam in the system
+lives in that one file. The Orchestrator imports **zero** concrete classes, only these seams:
 
 | Seam | Real | Fake / alternate |
 |---|---|---|
