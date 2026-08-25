@@ -18,8 +18,9 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
-from amsx.protocols import Module
-from amsx.types import ModuleId, ModuleState, MoveResult
+from amsx.enums import ModuleState
+from amsx.errors import ClusterBusyError
+from amsx.types import Module, ModuleId, MoveResult
 
 T = TypeVar("T")
 
@@ -175,7 +176,3 @@ class Cluster:
                 return await motion()
             finally:
                 self.active = None
-
-
-class ClusterBusyError(RuntimeError):
-    """Raised when a second module tries to move while the cluster's active slot is held."""

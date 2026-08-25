@@ -17,16 +17,11 @@ import asyncio
 
 import pytest
 
+from amsx.enums import ModuleState, PauseReason, SwapState
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
 from amsx.module import Cluster, ClusterBusyError, ManualModule, ModuleRegistry
 from amsx.orchestration import Orchestrator, SwapStateMachine
-from amsx.types import (
-    ModuleState,
-    PauseReason,
-    PlannedSwap,
-    SwapPlan,
-    SwapState,
-)
+from amsx.types import PlannedSwap, SwapPlan
 from fakes import FakePrinter, auto_answer
 
 PRINTER_ID = "x1c-1"

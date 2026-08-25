@@ -7,32 +7,12 @@ reach Spoolman returns empty/None and logs, never raising into the swap path.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Protocol, runtime_checkable
 
-from ..types import ModuleId, Spool, SpoolSpec
+from ..types import ModuleId, Spool, SpoolSpec, SpoolStore
 
+# SpoolStore is defined in amsx.types.protocols (all seams live together) and re-exported here
+# so `from amsx.inventory import SpoolStore` keeps reading naturally next to its implementations.
 __all__ = ["FakeSpoolStore", "SpoolStore"]
-
-
-@runtime_checkable
-class SpoolStore(Protocol):
-    async def list_spools(self, *, include_archived: bool = False) -> list[Spool]: ...
-    async def get_spool(self, spool_id: str) -> Spool | None: ...
-    async def loaded_in(self, module_id: ModuleId) -> Spool | None: ...
-    async def set_module(self, spool_id: str, module_id: ModuleId | None) -> None: ...
-    async def match(self, material: str | None, color_hex: str | None) -> list[Spool]: ...
-    async def consume(self, spool_id: str, grams: float) -> None: ...
-    async def ensure_module_field(self) -> None: ...
-    async def create_spool(self, spec: SpoolSpec) -> Spool: ...
-    async def update_spool(
-        self,
-        spool_id: str,
-        *,
-        remaining_g: float | None = None,
-        location: str | None = None,
-        archived: bool | None = None,
-    ) -> Spool: ...
-    async def delete_spool(self, spool_id: str) -> None: ...
 
 
 class FakeSpoolStore:

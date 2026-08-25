@@ -18,10 +18,11 @@ from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..brain import Brain, build_brain
+from ..enums import PauseReason
 from ..events import PauseEvent, SensorEvent
 from ..orchestration import Orchestrator
 from ..printer import Printer
-from ..types import PauseReason, SpoolSpec
+from ..types import SpoolSpec
 from .models import (
     AnswerResult,
     AssignmentResponse,

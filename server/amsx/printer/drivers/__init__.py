@@ -13,41 +13,12 @@ are confirmed.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from ...enums import PauseReason
+from ...types import PrinterDriver, Report
 
-from ...transport import Report
-from ...types import PauseReason
-
-
-@runtime_checkable
-class PrinterDriver(Protocol):
-    """Model-specific command builder. Option A: ride Bambu's existing change routine.
-
-    Methods return the request payload (a dict) to be sent over the ``PrinterLink`` — keeping
-    the driver pure/testable and the link responsible for the wire. The Printer owns sequencing
-    and state; the driver only knows "what does an unload look like on *this* model".
-    """
-
-    model: str
-
-    def request_unload(self) -> Report: ...
-    def request_extrude(self) -> Report: ...
-    def request_confirm_resume(self) -> Report: ...
-    def request_start_print(self, remote_path: str) -> Report: ...
-
-    def parse_pause_reason(self, report: Report) -> PauseReason: ...
-    def parse_filament_present(self, report: Report) -> bool | None: ...
-
-    def parse_external_filament(self, report: Report) -> tuple[str | None, str | None]: ...
-    def request_set_external_filament(
-        self,
-        material: str | None,
-        color_hex: str | None,
-        *,
-        tray_info_idx: str = "GFL04",
-        tmin: int = 190,
-        tmax: int = 240,
-    ) -> Report: ...
+# PrinterDriver (the seam) is defined in amsx.types.protocols alongside every other seam, and
+# re-exported here so it reads next to the X1P1Driver / A1Driver that implement it.
+__all__ = ["A1Driver", "PrinterDriver", "X1P1Driver"]
 
 
 class X1P1Driver:

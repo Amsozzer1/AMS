@@ -19,9 +19,10 @@ from __future__ import annotations
 import copy
 import logging
 
+from ..enums import PauseReason, PrinterStage
 from ..events import EventBus, FaultEvent, FinishedEvent, PauseEvent, SensorEvent
 from ..transport import FtpClient, PrinterLink, Report
-from ..types import FilamentRef, PauseReason, PrinterId, PrinterStage
+from ..types import FilamentRef, PrinterId
 from .drivers import PrinterDriver
 
 log = logging.getLogger("amsx.printer")

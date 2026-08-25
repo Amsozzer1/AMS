@@ -12,7 +12,8 @@ from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
-from .types import ModuleId, ModuleState, PauseReason, PrinterId
+from .enums import ModuleState, PauseReason
+from .types import ModuleId, PrinterId
 
 
 # ---- event payloads ----

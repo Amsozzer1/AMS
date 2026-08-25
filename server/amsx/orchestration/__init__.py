@@ -28,10 +28,11 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from amsx.enums import PauseReason, SwapState
+from amsx.errors import PauseValidationError, SwapFault
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
 from amsx.inventory import SpoolStore
-from amsx.protocols import Module, PrinterControl
-from amsx.types import PauseReason, PlannedSwap, SwapPlan, SwapState
+from amsx.types import Module, PlannedSwap, PrinterControl, SwapPlan
 
 log = logging.getLogger("amsx.orchestration")
 
@@ -91,22 +92,6 @@ async def consume_plan(
             await store.consume(spool_id, grams)
         except Exception:  # SOFT — consume errors must never break the swap path
             pass
-
-
-class PauseValidationError(Exception):
-    """A pause we cannot match to our own plan (untagged / mismatched / out of swaps).
-
-    Per docs/02 + docs/09 this is an EXCEPTION, never a swap: the orchestrator safe-holds and
-    alerts. Carrying the offending event keeps the alert specific.
-    """
-
-    def __init__(self, message: str, event: PauseEvent) -> None:
-        super().__init__(message)
-        self.event = event
-
-
-class SwapFault(Exception):
-    """A swap step failed (sensor never tripped, a move faulted). The machine lands in FAULT."""
 
 
 @dataclass

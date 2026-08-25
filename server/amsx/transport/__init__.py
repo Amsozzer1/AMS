@@ -20,16 +20,26 @@ import logging
 import ssl
 import threading
 from collections.abc import Awaitable, Callable
-from typing import Protocol, runtime_checkable
 
-from ..types import PrinterId
+from ..types import FtpClient, PrinterId, PrinterLink, Report, ReportHandler
 
 log = logging.getLogger("amsx.transport")
 
-# A raw MQTT report payload, already JSON-decoded into a dict. The exact schema is Bambu's and
-# is PHASE-0-unverified; see PrinterState / X1P1Driver for the specific fields we read.
-Report = dict[str, object]
-ReportHandler = Callable[[Report], Awaitable[None]]
+# PrinterLink / FtpClient (the seams) and Report / ReportHandler (the wire shapes) are defined
+# in amsx.types and re-exported here, so callers can keep importing them alongside the concrete
+# MqttPrinterLink / FtpsClient that implement them.
+__all__ = [
+    "FtpClient",
+    "FtpsClient",
+    "MqttBus",
+    "MqttPrinterLink",
+    "PrinterLink",
+    "Report",
+    "ReportHandler",
+    "SimulatedFtpClient",
+    "SimulatedPrinterLink",
+]
+
 TopicHandler = Callable[[str, bytes], Awaitable[None]]
 
 
@@ -150,23 +160,6 @@ class MqttBus:
 # --------------------------------------------------------------------------------------------
 # PrinterLink — one per printer; the request/report seam
 # --------------------------------------------------------------------------------------------
-@runtime_checkable
-class PrinterLink(Protocol):
-    """One per printer. Out on ``device/{serial}/request``; in on ``device/{serial}/report``.
-
-    Both the real (MQTT) and simulated implementations satisfy this Protocol so ``Printer`` is
-    transport-agnostic. ``request`` sends a command payload; ``on_report`` registers the
-    handler that receives full + delta reports.
-    """
-
-    printer_id: PrinterId
-    serial: str
-
-    async def request(self, payload: Report) -> None: ...
-
-    def on_report(self, handler: ReportHandler) -> None: ...
-
-
 class MqttPrinterLink:
     """Real PrinterLink over MQTT. PHASE-0 stub — shape only, no live transport yet."""
 
@@ -244,13 +237,6 @@ class SimulatedPrinterLink:
 # --------------------------------------------------------------------------------------------
 # FtpClient — LAN file upload (FTPS) of the sliced job
 # --------------------------------------------------------------------------------------------
-@runtime_checkable
-class FtpClient(Protocol):
-    """Uploads the sliced ``.gcode.3mf`` to the printer over FTPS and returns its remote path."""
-
-    async def upload(self, printer: PrinterId, file: str) -> str: ...
-
-
 class _ImplicitFTPTLS(ftplib.FTP_TLS):
     """``ftplib`` speaks *explicit* FTPS (plaintext greeting, then ``AUTH TLS``); Bambu speaks
     *implicit* FTPS — the control channel is TLS from the first byte on port 990. We wrap the

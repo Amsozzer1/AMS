@@ -43,6 +43,7 @@ from pathlib import Path
 
 from defusedxml.ElementTree import fromstring as _xml_fromstring  # XXE / billion-laughs safe
 
+from amsx.errors import JobParseError
 from amsx.types import FilamentColor, PlannedSwap, PrinterId, SwapPlan
 
 __all__ = ["PLATE_GCODE_PATH", "Job", "JobParseError", "JobParser"]
@@ -131,14 +132,6 @@ def _base_index(zf: zipfile.ZipFile) -> int | None:
         return int(plate["sequence"][0])
     except (KeyError, ValueError, StopIteration, IndexError, TypeError):
         return None
-
-
-class JobParseError(Exception):
-    """Raised when a 3MF cannot be turned into a SwapPlan.
-
-    Covers: not a zip, missing ``Metadata/plate_1.gcode`` (likely an *unsliced*
-    project 3MF — out of scope), or no changes (``M400 U1``) found at all.
-    """
 
 
 @dataclass(frozen=True)

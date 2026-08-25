@@ -74,14 +74,17 @@ layers = [
     "amsx.orchestration",
     "amsx.printer",
     "amsx.transport | amsx.job | amsx.module | amsx.inventory",
-    "amsx.protocols | amsx.events",
-    "amsx.types | amsx.utils | amsx.config",
+    "amsx.events",
+    "amsx.types",
+    "amsx.enums | amsx.errors | amsx.utils | amsx.config",
 ]
 
+# amsx.protocols was folded into amsx.types (all seams in one file), so `types` now sits on its
+# own layer above `enums` — it names the enums in the protocol signatures.
 [[tool.importlinter.contracts]]
 name = "the kernel stays dependency-free"
 type = "independence"
-modules = ["amsx.types", "amsx.utils", "amsx.config"]
+modules = ["amsx.enums", "amsx.errors", "amsx.utils", "amsx.config"]
 
 [[tool.importlinter.contracts]]
 name = "orchestration depends on seams, never on concrete implementations"
