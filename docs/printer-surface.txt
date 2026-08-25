@@ -1,0 +1,115 @@
+PRINTER SURFACE — everything we do to a Bambu printer, one line each
+Generated from the code. [OK] = confirmed live on the A1 mini. [??] = unverified guess.
+====================================================================================
+
+
+CONNECTING
+----------
+MQTT       TLS on port 8883, user "bblp", password = LAN access code    [OK]
+MQTT cert  self-signed, verification disabled (LAN-only, code-gated)    [OK]
+MQTT out   publish to  device/{serial}/request                          [OK]
+MQTT in    subscribe to device/{serial}/report                          [OK]
+FTPS       implicit TLS on port 990, user "bblp", same access code      [OK]
+FTPS quirk TLS from the first byte, not AUTH TLS (that's "implicit")    [OK]
+FTPS quirk data channel must reuse the control connection's TLS session [OK]
+FTPS quirk skip conn.unwrap() after STOR or it hangs waiting for 226    [OK]
+FTPS dir   files go to /cache on the printer's SD card                  [OK]
+
+
+COMMANDS WE SEND (A1)
+---------------------
+unload_filament       retract the spent filament; Bambu heats the nozzle itself   [OK]
+resume                lift the change-pause and continue the print                [OK]
+project_file          start printing a file already uploaded to the SD card       [OK]
+ams_filament_setting  tell the printer what colour/material is on the ext spool   [OK]
+gcode_line            send raw gcode lines (used only for the extrude fallback)   [??]
+pushall               ask for a full state dump                                    [OK]
+                      {"pushing":{"command":"pushall","sequence_id":"1"}} works
+                      live. NOTE the copy in Printer.connect() omits sequence_id
+                      and is still labelled unverified — same idea, not identical.
+
+
+COMMANDS WE SEND (X1/P1) — none of this has touched hardware
+------------------------------------------------------------
+gcode_line "M620 S255"  guessed unload trigger                                    [??]
+gcode_line "M1020 S0"   guessed filament-select / extrude                         [??]
+resume                  guessed resume verb                                       [??]
+project_file            guessed start-print shape                                 [??]
+ams_filament_setting    not supported on this path — returns an empty payload     [OK]
+
+
+THE SWAP LOOP (what actually runs per filament change)
+------------------------------------------------------
+1. printer pauses on M400 U1 and we see it in the report            [OK]
+2. routine_unload()          -> unload_filament                     [OK]
+3. human (or later, a motor) swaps the spool                        [OK]
+4. we watch the printer's own filament sensor until it trips        [OK]
+5. routine_confirm_resume()  -> resume                              [OK]
+6. cursor advances to the next planned swap                         [OK]
+   routine_extrude()  exists but is NOT in this loop — see below    [??]
+
+
+STARTING A PRINT
+----------------
+1. FTPS upload the .gcode.3mf to /cache/<name>                                    [OK]
+2. project_file with url = file:///sdcard/cache/<name>                            [OK]
+   -> NOT ftp:///cache/... ; that faulted the A1 with SD read/write error 0500_C010
+3. param = "Metadata/plate_1.gcode" (the gcode inside the 3mf zip)                [OK]
+4. use_ams = false, ams_mapping = []  (external spool, never the AMS)             [OK]
+5. project/profile/task/subtask ids all "0" = a local LAN print, no cloud         [OK]
+6. plate_idx 0, bed_type auto, bed_leveling true                                  [OK]
+7. timelapse / flow_cali / vibration_cali / layer_inspect all false               [OK]
+
+
+REPORT FIELDS WE READ
+---------------------
+print                  the outer envelope everything else sits inside      [OK]
+gcode_state            RUNNING / PAUSE / FINISH / FAILED                   [??]
+hw_switch_state        A1 filament-present sensor, 1 = present             [OK]
+filam_bak              X1/P1 filament sensor — guessed field name          [??]
+vt_tray                the external spool's tray object                    [OK]
+vt_tray.tray_color     current colour as 8-hex RRGGBBAA                    [OK]
+vt_tray.tray_type      current material, e.g. "PLA"                        [OK]
+tray_now               which tray the printer thinks is active             [??]
+mc_print_line_number   gcode line at the pause — reports 0 on the A1       [OK]
+layer_num              current layer — the A1 DOES report this correctly   [OK]
+print_error            fault codes — 0500_C010 was read from here live     [OK]
+print_error (as pause  using it to classify WHY a print paused is a guess  [??]
+  reason, X1/P1)
+
+
+WHAT WE READ / WRITE ON THE EXTERNAL SPOOL
+------------------------------------------
+read colour    parse vt_tray.tray_color, 8-hex -> 6-hex uppercase          [OK]
+read material  parse vt_tray.tray_type                                     [OK]
+write both     ams_filament_setting with ams_id 255, tray_id 254, slot 0   [OK]
+write colour   sent as 8-hex RRGGBBAA (we append FF alpha)                 [OK]
+write defaults tray_info_idx GFL04, nozzle temp 190-240                    [OK]
+
+
+THINGS THAT EXIST BUT AREN'T IN THE LOOP
+----------------------------------------
+routine_extrude()   M83 + G1 E45 F500 raw push. Diagnostic fallback only.
+                    Needs a hot nozzle. The real loop closes on the sensor
+                    plus resume, and Bambu loads/purges by itself.          [??]
+_STAGE_FIELD        defined on the X1/P1 driver, never read by anything.
+                    Stage is actually parsed in service.py with the field
+                    name hardcoded. Dead code.                             [??]
+
+
+WHAT WE DELIBERATELY NEVER DO
+-----------------------------
+never author our own hotend gcode — we ride Bambu's existing change routine
+never send a nozzle temperature — unload_filament heats it for us
+never send a retract distance — the firmware owns that
+never touch the AMS protocol — external spool only
+never talk to the cloud — LAN mode, all ids "0"
+never read the printer sensor from a module — only the Brain does that
+
+
+BIGGEST GAPS
+------------
+X1/P1 driver is guesses end to end — 31 PHASE-0 markers, zero hardware time
+FTPS has no unit tests at all; only the live check script exercises it
+build_brain(simulate=False) had zero coverage until recently
+the filament sensor is the only thing closing the swap loop — no timeout proof at scale
