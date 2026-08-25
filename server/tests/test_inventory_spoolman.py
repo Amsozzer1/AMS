@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from amsx.config import SpoolmanConfig
-from amsx.inventory.spoolman import SpoolmanStore
+from amsx.libs.spoolman import SpoolmanStore
 
 pytestmark = pytest.mark.asyncio
 

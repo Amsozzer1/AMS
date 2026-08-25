@@ -12,10 +12,10 @@ import logging
 
 import httpx
 
-from ..config import SpoolmanConfig
-from ..types import ModuleId, Spool, SpoolSpec
+from amsx.config import SpoolmanConfig
+from amsx.types import ModuleId, Spool, SpoolSpec
 
-log = logging.getLogger("amsx.inventory")
+log = logging.getLogger("amsx.apps.inventory")
 MODULE_FIELD = "ams_module"
 
 # Filament density defaults by material (g/cm³), diameter always 1.75 mm.

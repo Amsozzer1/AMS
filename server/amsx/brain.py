@@ -5,29 +5,28 @@ It wires the *real* layer classes together against the shared protocols, so the 
 "fake" in v0 is the actuator (`ManualModule`) and — until the v0.2 spike confirms MQTT — the
 transport (simulate mode).
 
-`PromptBroker` turns a `ManualModule`'s blocking stdin prompt into an async request the HTTP
-API can answer, which is exactly the v0 money-shot: server prompts the human, human swaps,
-server resumes.
+It owns a `PromptBroker` (see `amsx.apps.prompt`) but defines nothing itself — everything here
+is construction and wiring.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
 
-from .config import Config, load_config
-from .events import EventBus, FinishedEvent
-from .inventory import FakeSpoolStore, SpoolStore
-from .inventory.resolver import ProposedRow, Resolver
-from .job import Job, JobParser
-from .module import Cluster, ManualModule, Module, ModuleRegistry
-from .orchestration import Orchestrator, consume_plan
-from .printer import Printer
-from .printer.drivers import A1Driver, PrinterDriver, X1P1Driver
-from .transport import (
+from amsx.apps.inventory import FakeSpoolStore, SpoolStore
+from amsx.apps.inventory.resolver import ProposedRow, Resolver
+from amsx.apps.job import Job, JobParser
+from amsx.apps.module import Cluster, ManualModule, Module, ModuleRegistry
+from amsx.apps.orchestration import Orchestrator, consume_plan
+from amsx.apps.printer import Printer
+from amsx.apps.printer.drivers import A1Driver, PrinterDriver, X1P1Driver
+from amsx.apps.prompt import PromptBroker
+from amsx.config import Config, load_config
+from amsx.events import EventBus, FinishedEvent
+from amsx.transport import (
     FtpClient,
     FtpsClient,
     MqttBus,
@@ -36,7 +35,7 @@ from .transport import (
     SimulatedFtpClient,
     SimulatedPrinterLink,
 )
-from .types import ModuleId, PrinterId
+from amsx.types import ModuleId, PrinterId
 
 log = logging.getLogger("amsx.brain")
 
@@ -59,58 +58,6 @@ def _make_driver(model: str) -> PrinterDriver:
     if m in ("a1", "a1-mini", "a1mini"):
         return A1Driver()
     raise ValueError(f"unknown printer model {model!r} (expected x1|p1|a1|a1-mini)")
-
-
-class PendingPrompt:
-    """A human action the orchestrator is waiting on (surfaced over HTTP)."""
-
-    def __init__(self, prompt_id: str, module_id: ModuleId, message: str) -> None:
-        self.id = prompt_id
-        self.module_id = module_id
-        self.message = message
-        self.future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
-
-
-class PromptBroker:
-    """Bridges `ManualModule`'s async prompter to the API. `ask` blocks the swap until the
-    human answers via `answer`. This is the v0 stand-in for module hardware.
-    """
-
-    def __init__(self) -> None:
-        self._pending: dict[str, PendingPrompt] = {}
-        self._counter = 0
-
-    def prompter_for(self, module_id: ModuleId):
-        async def _prompter(message: str) -> str:
-            return await self.ask(module_id, message)
-
-        return _prompter
-
-    async def ask(self, module_id: ModuleId, message: str) -> str:
-        self._counter += 1
-        prompt_id = f"p{self._counter}"
-        pending = PendingPrompt(prompt_id, module_id, message)
-        self._pending[prompt_id] = pending
-        log.info("PROMPT %s [module %s]: %s", prompt_id, module_id, message)
-        try:
-            return await pending.future
-        finally:
-            self._pending.pop(prompt_id, None)
-
-    def answer(self, prompt_id: str, response: str = "done") -> bool:
-        pending = self._pending.get(prompt_id)
-        if pending is None:
-            return False
-        log.info("PROMPT %s answered (module %s): %s", prompt_id, pending.module_id, response)
-        if not pending.future.done():
-            pending.future.set_result(response)
-        return True
-
-    def pending(self) -> list[dict]:
-        return [
-            {"id": p.id, "module_id": p.module_id, "message": p.message}
-            for p in self._pending.values()
-        ]
 
 
 class Brain:

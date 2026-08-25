@@ -71,13 +71,16 @@ type = "layers"
 layers = [
     "amsx.api",
     "amsx.brain",
-    "amsx.orchestration",
-    "amsx.printer",
-    "amsx.transport | amsx.job | amsx.module | amsx.inventory",
+    "amsx.apps",
+    "amsx.transport | amsx.libs",
     "amsx.events",
     "amsx.types",
     "amsx.enums | amsx.errors | amsx.utils | amsx.config",
 ]
+
+# Within amsx.apps, orchestration must not reach a concrete printer — see the forbidden
+# contract below. Siblings may otherwise import each other (job's plan feeds inventory's
+# resolver), so apps is one layer rather than an independence contract.
 
 # amsx.protocols was folded into amsx.types (all seams in one file), so `types` now sits on its
 # own layer above `enums` — it names the enums in the protocol signatures.
@@ -89,5 +92,11 @@ modules = ["amsx.enums", "amsx.errors", "amsx.utils", "amsx.config"]
 [[tool.importlinter.contracts]]
 name = "orchestration depends on seams, never on concrete implementations"
 type = "forbidden"
-source_modules = ["amsx.orchestration"]
-forbidden_modules = ["amsx.printer", "amsx.transport", "amsx.brain", "amsx.api"]
+source_modules = ["amsx.apps.orchestration"]
+forbidden_modules = [
+    "amsx.apps.printer",
+    "amsx.transport",
+    "amsx.libs",
+    "amsx.brain",
+    "amsx.api",
+]

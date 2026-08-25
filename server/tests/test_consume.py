@@ -1,10 +1,10 @@
 # server/tests/test_consume.py
 import pytest
 
-from amsx.inventory import FakeSpoolStore
+from amsx.apps.inventory import FakeSpoolStore
 
 # Construct the consume helper directly (pure function over store + plan + assignment).
-from amsx.orchestration import consume_plan
+from amsx.apps.orchestration import consume_plan
 from amsx.types import FilamentColor, Spool, SwapPlan
 
 pytestmark = pytest.mark.asyncio

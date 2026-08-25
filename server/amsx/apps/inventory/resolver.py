@@ -6,8 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from ..types import FilamentColor, ModuleId, SwapPlan
-from . import SpoolStore
+from amsx.types import FilamentColor, ModuleId, SpoolStore, SwapPlan
 
 
 @dataclass(frozen=True)

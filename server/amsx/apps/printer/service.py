@@ -19,13 +19,13 @@ from __future__ import annotations
 import copy
 import logging
 
-from ..enums import PauseReason, PrinterStage
-from ..events import EventBus, FaultEvent, FinishedEvent, PauseEvent, SensorEvent
-from ..transport import FtpClient, PrinterLink, Report
-from ..types import FilamentRef, PrinterId
-from .drivers import PrinterDriver
+from amsx.apps.printer.drivers import PrinterDriver
+from amsx.enums import PauseReason, PrinterStage
+from amsx.events import EventBus, FaultEvent, FinishedEvent, PauseEvent, SensorEvent
+from amsx.transport import FtpClient, PrinterLink, Report
+from amsx.types import FilamentRef, PrinterId
 
-log = logging.getLogger("amsx.printer")
+log = logging.getLogger("amsx.apps.printer")
 
 # Map the driver-parsed stage string → our PrinterStage enum. The RHS keys are PHASE-0 guesses.
 # PHASE-0: verify — the actual gcode_state literals Bambu emits (docs/09 UNVERIFIED #1).

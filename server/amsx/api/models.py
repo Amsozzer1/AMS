@@ -15,9 +15,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from ..inventory.resolver import ProposedRow
-from ..orchestration import Orchestrator
-from ..types import Spool as DomainSpool
+from amsx.apps.inventory.resolver import ProposedRow
+from amsx.apps.orchestration import Orchestrator
+from amsx.types import Spool as DomainSpool
 
 # ---- requests -------------------------------------------------------------------------
 

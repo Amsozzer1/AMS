@@ -41,10 +41,10 @@ import asyncio
 import json
 from pathlib import Path
 
+from amsx.apps.printer import Printer
+from amsx.apps.printer.drivers import A1Driver
 from amsx.config import load_config
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
-from amsx.printer import Printer
-from amsx.printer.drivers import A1Driver
 from amsx.transport import MqttBus, MqttPrinterLink
 
 REPO = Path(__file__).resolve().parents[1]

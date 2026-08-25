@@ -1,6 +1,6 @@
 """Tests for vt_tray external-filament read/write (A1Driver, Task 5)."""
 
-from amsx.printer.drivers import A1Driver
+from amsx.apps.printer.drivers import A1Driver
 
 
 def test_parse_external_filament():

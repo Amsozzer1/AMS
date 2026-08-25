@@ -13,8 +13,8 @@ are confirmed.
 
 from __future__ import annotations
 
-from ...enums import PauseReason
-from ...types import PrinterDriver, Report
+from amsx.enums import PauseReason
+from amsx.types import PrinterDriver, Report
 
 # PrinterDriver (the seam) is defined in amsx.types.protocols alongside every other seam, and
 # re-exported here so it reads next to the X1P1Driver / A1Driver that implement it.

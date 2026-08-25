@@ -17,13 +17,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..brain import Brain, build_brain
-from ..enums import PauseReason
-from ..events import PauseEvent, SensorEvent
-from ..orchestration import Orchestrator
-from ..printer import Printer
-from ..types import SpoolSpec
-from .models import (
+from amsx.api.models import (
     AnswerResult,
     AssignmentResponse,
     AssignRow,
@@ -47,6 +41,12 @@ from .models import (
     SpoolUpdate,
     StartArmedResult,
 )
+from amsx.apps.orchestration import Orchestrator
+from amsx.apps.printer import Printer
+from amsx.brain import Brain, build_brain
+from amsx.enums import PauseReason
+from amsx.events import PauseEvent, SensorEvent
+from amsx.types import SpoolSpec
 
 log = logging.getLogger("amsx.api")
 

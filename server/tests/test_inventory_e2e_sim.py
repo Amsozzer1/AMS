@@ -20,9 +20,9 @@ import zipfile
 from fastapi.testclient import TestClient
 
 from amsx.api import create_app
+from amsx.apps.inventory import FakeSpoolStore
 from amsx.brain import Brain
 from amsx.config import Config, ModuleConfig, PrinterConfig
-from amsx.inventory import FakeSpoolStore
 from amsx.types import Spool
 
 # ---------------------------------------------------------------------------

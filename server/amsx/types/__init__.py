@@ -11,9 +11,9 @@ Design source: docs/10-domain-model.md and docs/06-module-interface.md.
 
 from __future__ import annotations
 
-from .filament import FilamentColor, FilamentRef
-from .ids import ClusterId, ModuleId, PrinterId
-from .protocols import (
+from amsx.types.filament import FilamentColor, FilamentRef
+from amsx.types.ids import ClusterId, ModuleId, PrinterId
+from amsx.types.protocols import (
     FtpClient,
     Module,
     PrinterControl,
@@ -21,9 +21,9 @@ from .protocols import (
     PrinterLink,
     SpoolStore,
 )
-from .spool import Spool, SpoolSpec
-from .swap import MoveResult, PlannedSwap, SwapPlan
-from .wire import Report, ReportHandler
+from amsx.types.spool import Spool, SpoolSpec
+from amsx.types.swap import MoveResult, PlannedSwap, SwapPlan
+from amsx.types.wire import Report, ReportHandler
 
 __all__ = [
     "ClusterId",

@@ -15,10 +15,10 @@ from __future__ import annotations
 
 import pytest
 
+from amsx.apps.printer import Printer, PrinterState
+from amsx.apps.printer.drivers import A1Driver, X1P1Driver
 from amsx.enums import PauseReason, PrinterStage
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
-from amsx.printer import Printer, PrinterState
-from amsx.printer.drivers import A1Driver, X1P1Driver
 from amsx.transport import SimulatedFtpClient, SimulatedPrinterLink
 from amsx.types import FilamentRef, PrinterControl
 

@@ -28,13 +28,13 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from amsx.apps.inventory import SpoolStore
 from amsx.enums import PauseReason, SwapState
 from amsx.errors import PauseValidationError, SwapFault
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
-from amsx.inventory import SpoolStore
 from amsx.types import Module, PlannedSwap, PrinterControl, SwapPlan
 
-log = logging.getLogger("amsx.orchestration")
+log = logging.getLogger("amsx.apps.orchestration")
 
 # Defaults for the v0 swap geometry. The retract distance is "enough to clear the shared hub
 # line" (docs/02 — a full retract clears the line before the next feed). Tunable per install.

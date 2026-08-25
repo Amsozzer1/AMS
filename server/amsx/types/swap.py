@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .filament import FilamentColor
+from amsx.types.filament import FilamentColor
 
 __all__ = ["MoveResult", "PlannedSwap", "SwapPlan"]
 

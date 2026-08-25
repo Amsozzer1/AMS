@@ -1,7 +1,7 @@
 import pytest
 
-from amsx.inventory import FakeSpoolStore
-from amsx.inventory.resolver import Resolver
+from amsx.apps.inventory import FakeSpoolStore
+from amsx.apps.inventory.resolver import Resolver
 from amsx.types import FilamentColor, PlannedSwap, Spool, SwapPlan
 
 pytestmark = pytest.mark.asyncio

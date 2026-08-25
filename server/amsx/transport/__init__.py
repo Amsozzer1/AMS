@@ -21,7 +21,7 @@ import ssl
 import threading
 from collections.abc import Awaitable, Callable
 
-from ..types import FtpClient, PrinterId, PrinterLink, Report, ReportHandler
+from amsx.types import FtpClient, PrinterId, PrinterLink, Report, ReportHandler
 
 log = logging.getLogger("amsx.transport")
 

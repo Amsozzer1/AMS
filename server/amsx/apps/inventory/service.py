@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ..types import ModuleId, Spool, SpoolSpec, SpoolStore
+from amsx.types import ModuleId, Spool, SpoolSpec, SpoolStore
 
-# SpoolStore is defined in amsx.types.protocols (all seams live together) and re-exported here
-# so `from amsx.inventory import SpoolStore` keeps reading naturally next to its implementations.
+# SpoolStore is defined in amsx.types.protocols (all seams live together) and re-exported by
+# this package's __init__, so it reads naturally next to the stores that implement it.
 __all__ = ["FakeSpoolStore", "SpoolStore"]
 
 

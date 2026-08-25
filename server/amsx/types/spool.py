@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .ids import ModuleId
+from amsx.types.ids import ModuleId
 
 __all__ = ["Spool", "SpoolSpec"]
 

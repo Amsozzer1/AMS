@@ -16,12 +16,12 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from ..enums import ModuleState, PauseReason
-from .filament import FilamentRef
-from .ids import ModuleId, PrinterId
-from .spool import Spool, SpoolSpec
-from .swap import MoveResult
-from .wire import Report, ReportHandler
+from amsx.enums import ModuleState, PauseReason
+from amsx.types.filament import FilamentRef
+from amsx.types.ids import ModuleId, PrinterId
+from amsx.types.spool import Spool, SpoolSpec
+from amsx.types.swap import MoveResult
+from amsx.types.wire import Report, ReportHandler
 
 __all__ = [
     "FtpClient",

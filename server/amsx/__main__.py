@@ -13,7 +13,7 @@ import logging
 import os
 from pathlib import Path
 
-from .api import create_app
+from amsx.api import create_app
 
 
 def _truthy(name: str, default: str = "0") -> bool:

@@ -17,10 +17,10 @@ import asyncio
 
 import pytest
 
+from amsx.apps.module import Cluster, ClusterBusyError, ManualModule, ModuleRegistry
+from amsx.apps.orchestration import Orchestrator, SwapStateMachine
 from amsx.enums import ModuleState, PauseReason, SwapState
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
-from amsx.module import Cluster, ClusterBusyError, ManualModule, ModuleRegistry
-from amsx.orchestration import Orchestrator, SwapStateMachine
 from amsx.types import PlannedSwap, SwapPlan
 from fakes import FakePrinter, auto_answer
 
