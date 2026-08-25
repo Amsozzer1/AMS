@@ -215,3 +215,55 @@ def test_job_start_without_arm_is_409():
 def test_job_start_unknown_printer_404():
     with TestClient(create_app(_sim_brain())) as client:
         assert client.post("/api/printers/ghost/job/start").status_code == 404
+
+
+# ---- regressions from the typed-response-model change --------------------------------------
+
+
+def test_odd_progress_values_do_not_break_printer_state():
+    """A firmware-specific `layer_num` must never 500 the whole dashboard.
+
+    `Printer._apply_fields` copies `layer_num` / `mc_percent` straight off the report without
+    validating them, so a non-integral or non-numeric value really can reach `state.progress`.
+    Before the response models existed the route returned that dict verbatim; a bare
+    `int | None` on the model would instead raise and take out /api/printers, /{id} and
+    /{id}/detail at once. Odd values are reported as absent, never as an error.
+    """
+    brain = _sim_brain()
+    with TestClient(create_app(brain)) as client:
+        printer = brain.printers["x1c-1"]
+        printer.state.progress = {"layer": 12.5, "percent": "not-a-number", "line": "abc"}
+
+        for path in ("/api/printers", "/api/printers/x1c-1", "/api/printers/x1c-1/detail"):
+            res = client.get(path)
+            assert res.status_code == 200, f"{path} -> {res.status_code} {res.text}"
+
+        state = client.get("/api/printers/x1c-1").json()
+        assert state["progress"]["layer"] is None
+        assert state["progress"]["percent"] is None
+        assert state["progress"]["line"] is None
+
+        # Clean values still survive, including the string ints Bambu actually sends.
+        printer.state.progress = {"layer": "37", "percent": 50.5, "line": 900}
+        state = client.get("/api/printers/x1c-1").json()
+        assert state["progress"] == {"layer": 37, "percent": 50.5, "line": 900}
+
+
+def test_sim_pause_returns_only_the_injected_form():
+    """A tagged pause returns `tag` and NO `line` key, and vice versa.
+
+    The response model carries both fields, so without `response_model_exclude_unset` each
+    reply gained the other key as null — a wire change for any client that tests for key
+    presence rather than value.
+    """
+    with TestClient(create_app(_sim_brain())) as client:
+        files = {"file": ("t.gcode.3mf", _sliced_3mf(0, 1), "application/octet-stream")}
+        client.post("/api/printers/x1c-1/job", params={"start": "false"}, files=files)
+
+        tagged = client.post("/api/printers/x1c-1/sim/pause", params={"tag": "T1"}).json()
+        assert tagged["injected"] == "pause" and tagged["tag"] == "T1"
+        assert "line" not in tagged
+
+        lined = client.post("/api/printers/x1c-1/sim/pause", params={"line": 4242}).json()
+        assert lined["injected"] == "pause" and lined["line"] == 4242
+        assert "tag" not in lined

@@ -626,8 +626,19 @@ export interface components {
          * Progress
          * @description Best-effort progress from the printer report.
          *
-         *     The server only ever writes ``layer`` / ``percent`` / ``line`` (see
-         *     ``Printer._apply_fields``), and it already treats a non-int layer/line as absent.
+         *     The server writes ``layer`` / ``percent`` / ``line`` straight off the report in
+         *     ``Printer._apply_fields`` **without validating them** — only the pause guard's
+         *     ``_progress_layer()`` filters non-ints, and that happens at read time, not write time.
+         *     So a firmware reporting ``layer_num: 12.5`` (or a non-numeric string) really can land in
+         *     ``state.progress``.
+         *
+         *     Before these models existed the route returned that dict verbatim and never failed. A
+         *     plain ``int | None`` would instead raise ``ValidationError`` and 500 EVERY printer-state
+         *     response — ``/api/printers``, ``/{id}``, and ``/{id}/detail`` — taking the whole dashboard
+         *     down over one odd field. The validator below keeps the old never-fails behaviour: a value
+         *     that is not cleanly numeric is reported as absent, which is what the server already
+         *     believes when it makes decisions.
+         *
          *     ``extra="allow"`` keeps any future report key from being silently dropped on the way out.
          */
         Progress: {
