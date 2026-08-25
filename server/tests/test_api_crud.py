@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from amsx.api import create_app
 from amsx.apps.inventory import FakeSpoolStore
 from amsx.config import Config, ModuleConfig, PrinterConfig
+from amsx.system.infra.http.app import create_app
 from amsx.types import Spool, SpoolSpec
 
 # ---- helpers (same pattern as test_api_inventory.py) ------------------------------------

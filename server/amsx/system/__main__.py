@@ -13,7 +13,7 @@ import logging
 import os
 from pathlib import Path
 
-from amsx.api import create_app
+from amsx.system.infra.http.app import create_app
 
 
 def _truthy(name: str, default: str = "0") -> bool:
@@ -65,7 +65,7 @@ def main() -> None:
         # server in sync with edits). uvicorn needs an import string + factory to own reloads.
         src_dir = str(Path(__file__).resolve().parent)  # .../src/amsx
         uvicorn.run(
-            "amsx.__main__:reload_app",
+            "amsx.system.__main__:reload_app",
             factory=True,
             host=host,
             port=port,

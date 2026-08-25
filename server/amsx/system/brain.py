@@ -16,6 +16,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
+import amsx
 from amsx.apps.inventory import FakeSpoolStore, SpoolStore
 from amsx.apps.inventory.resolver import ProposedRow, Resolver
 from amsx.apps.job import Job, JobParser
@@ -38,7 +39,10 @@ def default_config_path() -> Path:
     env = os.getenv("AMSX_CONFIG")
     if env:
         return Path(env)
-    here = Path(__file__).resolve().parents[1]  # .../server
+    # Anchored on the amsx package, NOT on this file's depth: `parents[N]` silently resolves
+    # somewhere else the moment this module moves, and it fails as a confusing "file not
+    # found" on a path that looks almost right. amsx/__init__.py's parent is always .../server.
+    here = Path(amsx.__file__).resolve().parent.parent  # .../server
     local = here / "config" / "ams.local.json"
     return local if local.exists() else here / "config" / "ams.example.json"
 

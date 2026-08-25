@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from amsx.api import create_app
 from amsx.apps.inventory import FakeSpoolStore
 from amsx.apps.inventory.resolver import ProposedRow
 from amsx.config import Config, ModuleConfig, PrinterConfig
+from amsx.system.infra.http.app import create_app
 from amsx.types import Spool
 
 

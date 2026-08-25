@@ -68,11 +68,17 @@ root_package = "amsx"
 [[tool.importlinter.contracts]]
 name = "amsx layers: nothing imports upward"
 type = "layers"
+#
+# Note the split inside amsx.system.infra.http: `app` mounts the routers so it sits at the very
+# top, while `view` holds the shared wire shapes the routes import, so it sits below them. Same
+# folder, opposite ends of the stack — infra/ is grouped by protocol, not by altitude.
 layers = [
-    "amsx.api",
+    "amsx.system.infra.http.app",
+    "amsx.routes",
+    "amsx.system.middlewares",
     "amsx.system.brain",
     "amsx.apps",
-    "amsx.system.infra | amsx.libs",
+    "amsx.system.infra.mqtt | amsx.system.infra.ftps | amsx.libs",
     "amsx.events",
     "amsx.types",
     "amsx.enums | amsx.errors | amsx.utils | amsx.config",
