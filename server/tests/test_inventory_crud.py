@@ -8,9 +8,9 @@ import json
 import httpx
 import pytest
 
+from amsx.apps.inventory import FakeSpoolStore, SpoolStore
 from amsx.config import SpoolmanConfig
-from amsx.inventory import FakeSpoolStore, SpoolStore
-from amsx.inventory.spoolman import SpoolmanStore
+from amsx.libs.spoolman import SpoolmanStore
 from amsx.types import Spool, SpoolSpec
 
 pytestmark = pytest.mark.asyncio

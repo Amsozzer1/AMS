@@ -1,4 +1,4 @@
-"""Tests for amsx.job.JobParser — sliced .gcode.3mf -> ordered SwapPlan.
+"""Tests for amsx.apps.job.JobParser — sliced .gcode.3mf -> ordered SwapPlan.
 
 Fixtures: ``tests/fixtures/plate_1.gcode`` is a small synthetic multi-change
 gcode. ``_make_3mf`` zips arbitrary plate gcode into a ``.gcode.3mf`` so each
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from amsx.job import PLATE_GCODE_PATH, Job, JobParseError, JobParser
+from amsx.apps.job import PLATE_GCODE_PATH, Job, JobParseError, JobParser
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

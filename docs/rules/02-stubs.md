@@ -17,5 +17,5 @@ def request_start_print(self, remote_path: str) -> Report: ...
 
 Why: stubs then fail *loudly* (calling one logs a warning and raises `NotImplementedError`
 naming the callable), are greppable in one place (`@todo` / `__todo__`), and carry their
-reason inline. The decorator lives in `server/src/amsx/utils/` and works on sync and async
+reason inline. The decorator lives in `server/amsx/utils/` and works on sync and async
 callables. A `Protocol` method is a *contract*, not a stub — do not decorate it.

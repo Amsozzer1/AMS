@@ -41,6 +41,13 @@ The rules Claude operates under. Indexed from [CLAUDE.md](../CLAUDE.md), loaded 
 | [rules/01-separation-of-concerns.md](rules/01-separation-of-concerns.md) | ⛔ One job per file; depend on seams so decisions stay reversible |
 | [rules/02-stubs.md](rules/02-stubs.md) | Unfinished work carries `@todo`, never a hand-written `NotImplementedError` |
 
+## Server
+
+| Doc | What it covers |
+|-----|----------------|
+| [server/00-architecture.md](server/00-architecture.md) | Package architecture — the layer stack, the `__init__`-as-door rule, where things live |
+| [server/01-http-layer.md](server/01-http-layer.md) | `routes/`, views, `Depends`, typed errors, and the generated contract |
+
 ## Frontend
 
 | Doc | What it covers |

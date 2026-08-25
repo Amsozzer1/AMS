@@ -15,7 +15,6 @@ dependencies = [
     "paho-mqtt>=2.1",          # transport/ — our own MQTT bus (printers + clusters)
     "pydantic>=2.9",           # typed models for the domain layer
     "pydantic-settings>=2.5",  # config/ loading
-    "pyyaml>=6.0",             # config/ — ams.yaml
     "httpx>=0.27",             # inventory/ — Spoolman REST (later)
     "defusedxml>=0.7",         # job/ — XXE/billion-laughs-safe XML parse of 3MF metadata
 ]
@@ -31,19 +30,19 @@ dev = [
 ]
 
 [project.scripts]
-amsx = "amsx.__main__:main"     # entrypoint placeholder (Brain.start) — not yet implemented
+amsx = "amsx.system.__main__:main"   # `uv run amsx` -> system/__main__.py
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/amsx"]
+packages = ["amsx"]
 
 # ---- Ruff (lint + format) ----
 [tool.ruff]
 line-length = 100
-src = ["src", "tests"]
+src = [".", "tests"]
 target-version = "py311"
 
 [tool.ruff.lint]
@@ -69,23 +68,40 @@ root_package = "amsx"
 [[tool.importlinter.contracts]]
 name = "amsx layers: nothing imports upward"
 type = "layers"
+#
+# Note the split inside amsx.system.infra.http: `app` mounts the routers so it sits at the very
+# top, while `view` holds the shared wire shapes the routes import, so it sits below them. Same
+# folder, opposite ends of the stack — infra/ is grouped by protocol, not by altitude.
 layers = [
-    "amsx.api",
-    "amsx.brain",
-    "amsx.orchestration",
-    "amsx.printer",
-    "amsx.transport | amsx.job | amsx.module | amsx.inventory",
-    "amsx.protocols | amsx.events",
-    "amsx.types | amsx.utils | amsx.config",
+    "amsx.system.infra.http.app",
+    "amsx.routes",
+    "amsx.system.middlewares",
+    "amsx.system.brain",
+    "amsx.apps",
+    "amsx.system.infra.mqtt | amsx.system.infra.ftps | amsx.libs",
+    "amsx.events",
+    "amsx.types",
+    "amsx.enums | amsx.errors | amsx.utils | amsx.config",
 ]
 
+# Within amsx.apps, orchestration must not reach a concrete printer — see the forbidden
+# contract below. Siblings may otherwise import each other (job's plan feeds inventory's
+# resolver), so apps is one layer rather than an independence contract.
+
+# amsx.protocols was folded into amsx.types (all seams in one file), so `types` now sits on its
+# own layer above `enums` — it names the enums in the protocol signatures.
 [[tool.importlinter.contracts]]
 name = "the kernel stays dependency-free"
 type = "independence"
-modules = ["amsx.types", "amsx.utils", "amsx.config"]
+modules = ["amsx.enums", "amsx.errors", "amsx.utils", "amsx.config"]
 
 [[tool.importlinter.contracts]]
 name = "orchestration depends on seams, never on concrete implementations"
 type = "forbidden"
-source_modules = ["amsx.orchestration"]
-forbidden_modules = ["amsx.printer", "amsx.transport", "amsx.brain", "amsx.api"]
+source_modules = ["amsx.apps.orchestration"]
+forbidden_modules = [
+    "amsx.apps.printer",
+    "amsx.system",
+    "amsx.libs",
+    "amsx.api",
+]

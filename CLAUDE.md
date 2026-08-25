@@ -48,6 +48,8 @@ hand-written `raise NotImplementedError`. A `Protocol` method is a contract, not
 | Area | Document |
 |---|---|
 | System / server | [docs/02-architecture.md](docs/02-architecture.md), [docs/10-domain-model.md](docs/10-domain-model.md) |
+| Server package layout | [docs/server/00-architecture.md](docs/server/00-architecture.md) |
+| Server HTTP layer | [docs/server/01-http-layer.md](docs/server/01-http-layer.md) |
 | Frontend | [docs/frontend/00-architecture.md](docs/frontend/00-architecture.md) |
 | Frontend API layer | [docs/frontend/01-api-layer.md](docs/frontend/01-api-layer.md) |
 | All design docs | [docs/README.md](docs/README.md) |

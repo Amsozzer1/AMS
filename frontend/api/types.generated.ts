@@ -123,6 +123,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/printers/{printer_id}/job/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Assignment
+         * @description Current spool-assignment proposal for the armed job on this printer.
+         *
+         *     Returns rows (one per filament index from the plan), each with the module/spool the
+         *     resolver proposed. `confirmed` is True once the operator has POST-confirmed the mapping.
+         *     Returns empty rows + confirmed=False when no job is armed.
+         */
+        get: operations["get_assignment_api_printers__printer_id__job_assignment_get"];
+        put?: never;
+        /**
+         * Confirm Assignment
+         * @description Confirm (and optionally override) the index→module mapping.
+         *
+         *     Body: `{index: module_id}` for each filament index. Persists each override into
+         *     brain.assignment so a follow-up GET reflects the chosen module/status. For rows
+         *     that carry a spool_id, also calls set_module on the store (SOFT — store errors are
+         *     logged and skipped so Spoolman down never 500s this endpoint).
+         *     Returns `{ok: true}`.
+         */
+        post: operations["confirm_assignment_api_printers__printer_id__job_assignment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/prompts": {
         parameters: {
             query?: never;
@@ -268,40 +302,6 @@ export interface paths {
          */
         put: operations["set_loadout_api_printers__printer_id__loadout_put"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/printers/{printer_id}/job/assignment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Assignment
-         * @description Current spool-assignment proposal for the armed job on this printer.
-         *
-         *     Returns rows (one per filament index from the plan), each with the module/spool the
-         *     resolver proposed. `confirmed` is True once the operator has POST-confirmed the mapping.
-         *     Returns empty rows + confirmed=False when no job is armed.
-         */
-        get: operations["get_assignment_api_printers__printer_id__job_assignment_get"];
-        put?: never;
-        /**
-         * Confirm Assignment
-         * @description Confirm (and optionally override) the index→module mapping.
-         *
-         *     Body: `{index: module_id}` for each filament index. Persists each override into
-         *     brain.assignment so a follow-up GET reflects the chosen module/status. For rows
-         *     that carry a spool_id, also calls set_module on the store (SOFT — store errors are
-         *     logged and skipped so Spoolman down never 500s this endpoint).
-         *     Returns `{ok: true}`.
-         */
-        post: operations["confirm_assignment_api_printers__printer_id__job_assignment_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -956,6 +956,74 @@ export interface operations {
             };
         };
     };
+    get_assignment_api_printers__printer_id__job_assignment_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_assignment_api_printers__printer_id__job_assignment_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_prompts_api_prompts_get: {
         parameters: {
             query?: never;
@@ -1234,74 +1302,6 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_assignment_api_printers__printer_id__job_assignment_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                printer_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssignmentResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_assignment_api_printers__printer_id__job_assignment_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                printer_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: string;
-                };
-            };
-        };
         responses: {
             /** @description Successful Response */
             200: {

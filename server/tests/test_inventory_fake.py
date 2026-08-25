@@ -1,7 +1,7 @@
 # server/tests/test_inventory_fake.py
 import pytest
 
-from amsx.inventory import FakeSpoolStore, SpoolStore
+from amsx.apps.inventory import FakeSpoolStore, SpoolStore
 from amsx.types import Spool
 
 pytestmark = pytest.mark.asyncio

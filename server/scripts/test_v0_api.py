@@ -9,7 +9,7 @@ with detail, then a summary, so you can report exactly what worked and what didn
 Run the server first (note the sim config + simulate mode):
 
     cd server
-    AMSX_SIMULATE=1 AMSX_CONFIG=config/ams.sim.yaml AMSX_PORT=9001 uv run amsx
+    AMSX_SIMULATE=1 AMSX_CONFIG=config/ams.sim.json AMSX_PORT=9001 uv run amsx
 
 then, in another terminal:
 
@@ -142,7 +142,7 @@ def run() -> int:
     if not check(
         "server is in simulate mode",
         simulate,
-        "rerun with AMSX_SIMULATE=1 AMSX_CONFIG=config/ams.sim.yaml",
+        "rerun with AMSX_SIMULATE=1 AMSX_CONFIG=config/ams.sim.json",
     ):
         print("\n  Sim hooks are disabled outside simulate mode — stopping.\n")
         return summary()

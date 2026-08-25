@@ -61,8 +61,11 @@ verify**, never settled facts, until a real printer confirms them.
   interface + `X1P1Driver` and `A1Driver`. **Both are built**; the A1 path is
   hardware-verified (vt_tray read + `ams_filament_setting` write). Read the driver before
   assuming a capability is missing.
-- Phase-0 **spike scripts** go in `spikes/` and are **throwaway, never shipped**. When a spike
-  confirms a payload/field, the *finding* moves into the real `printer/` or `transport/` code.
+- **Live-hardware check scripts** go in `server/scripts/` as `check_*.py`. They are run by hand
+  against a real printer, are never collected by pytest, and drive the *production* driver /
+  transport methods rather than hand-built payloads. When such a check confirms a payload/field,
+  the *finding* moves into the real `printer/` or `transport/` code and the `# PHASE-0: verify`
+  comment it settles is replaced.
 
 ## Hard rules
 - **Option A only.** Never author custom hotend gcode. You drive Bambu's *existing* change

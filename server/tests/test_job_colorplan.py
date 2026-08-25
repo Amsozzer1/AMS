@@ -3,7 +3,7 @@ import json
 import zipfile
 from pathlib import Path
 
-from amsx.job import Job, JobParser
+from amsx.apps.job import Job, JobParser
 
 PLATE = (
     "; layer num/total_layer_count: 1/3\n"

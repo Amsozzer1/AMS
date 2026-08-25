@@ -81,7 +81,6 @@ This is a monorepo. Each area has its own README with deeper detail.
 | [hardware/](hardware/) | CAD, wiring, and BOM for the modules / hub / clusters. |
 | [deploy/](deploy/) | Docker Compose for the CasaOS host (Brain + Mosquitto broker). |
 | [docs/](docs/) | Design docs: vision, architecture, protocol, domain model, roadmap, hardware. |
-| [spikes/](spikes/) | Throwaway hardware-verification scripts (MQTT control, 3MF parse, FTPS). Not shipped. |
 
 ---
 

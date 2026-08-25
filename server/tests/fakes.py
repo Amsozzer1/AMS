@@ -1,7 +1,7 @@
 """Test doubles for the orchestrator suite — a scriptable printer simulator and helpers.
 
 These live entirely in the test tree (the orchestrator must be provable with NO real hardware
-and NO real printer package). `FakePrinter` implements the `amsx.protocols.PrinterControl`
+and NO real printer package). `FakePrinter` implements the `amsx.types.PrinterControl`
 Protocol structurally and records the Option-A routine calls so tests can assert the swap
 sequence. `auto_answer` builds a `Prompter` that auto-confirms `ManualModule` prompts so tests
 never touch stdin.

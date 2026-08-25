@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from amsx.api import create_app
+from amsx.apps.inventory import FakeSpoolStore
+from amsx.apps.inventory.resolver import ProposedRow
 from amsx.config import Config, ModuleConfig, PrinterConfig
-from amsx.inventory import FakeSpoolStore
-from amsx.inventory.resolver import ProposedRow
+from amsx.system.infra.http.app import create_app
 from amsx.types import Spool
 
 
@@ -22,7 +22,7 @@ def _brain_with_store(spools: list[Spool] | None = None):
             ModuleConfig(id="m2", cluster_id="c", filament_index=1),
         ],
     )
-    from amsx.brain import Brain
+    from amsx.system.brain import Brain
 
     brain = Brain(config, simulate=True)
     brain.store = FakeSpoolStore(spools or [])

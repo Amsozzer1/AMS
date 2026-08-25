@@ -21,7 +21,7 @@ from pathlib import Path
 # Importable whether run via `uv run` (installed) or straight from a checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from amsx.api import create_app
+from amsx.system.infra.http.app import create_app
 
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "openapi.json"
 
