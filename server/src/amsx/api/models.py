@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..inventory.resolver import ProposedRow
 from ..orchestration import Orchestrator
@@ -76,8 +76,19 @@ class Health(BaseModel):
 class Progress(BaseModel):
     """Best-effort progress from the printer report.
 
-    The server only ever writes ``layer`` / ``percent`` / ``line`` (see
-    ``Printer._apply_fields``), and it already treats a non-int layer/line as absent.
+    The server writes ``layer`` / ``percent`` / ``line`` straight off the report in
+    ``Printer._apply_fields`` **without validating them** — only the pause guard's
+    ``_progress_layer()`` filters non-ints, and that happens at read time, not write time.
+    So a firmware reporting ``layer_num: 12.5`` (or a non-numeric string) really can land in
+    ``state.progress``.
+
+    Before these models existed the route returned that dict verbatim and never failed. A
+    plain ``int | None`` would instead raise ``ValidationError`` and 500 EVERY printer-state
+    response — ``/api/printers``, ``/{id}``, and ``/{id}/detail`` — taking the whole dashboard
+    down over one odd field. The validator below keeps the old never-fails behaviour: a value
+    that is not cleanly numeric is reported as absent, which is what the server already
+    believes when it makes decisions.
+
     ``extra="allow"`` keeps any future report key from being silently dropped on the way out.
     """
 
@@ -88,6 +99,34 @@ class Progress(BaseModel):
     layer: int | None = None
     percent: float | None = None
     line: int | None = None
+
+    @field_validator("layer", "line", mode="before")
+    @classmethod
+    def _int_or_absent(cls, v: object) -> int | None:
+        """Report a non-integral value as absent rather than 500-ing the response."""
+        if isinstance(v, bool) or v is None:
+            return None
+        if isinstance(v, int):
+            return v
+        if isinstance(v, float) and v.is_integer():
+            return int(v)
+        if isinstance(v, str) and v.strip().lstrip("-").isdigit():
+            return int(v)
+        return None
+
+    @field_validator("percent", mode="before")
+    @classmethod
+    def _float_or_absent(cls, v: object) -> float | None:
+        if isinstance(v, bool) or v is None:
+            return None
+        if isinstance(v, int | float):
+            return float(v)
+        if isinstance(v, str):
+            try:
+                return float(v.strip())
+            except ValueError:
+                return None
+        return None
 
 
 class LoadedFilament(BaseModel):

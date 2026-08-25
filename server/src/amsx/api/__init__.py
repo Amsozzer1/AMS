@@ -388,7 +388,10 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             )
         return orch
 
-    @app.post("/api/printers/{printer_id}/sim/pause")
+    # `response_model_exclude_unset` keeps the historical sparse shape: a tagged pause
+    # returns `tag` and no `line` key at all, and vice versa. Clients that test for key
+    # PRESENCE (rather than value) would otherwise see both keys, one of them null.
+    @app.post("/api/printers/{printer_id}/sim/pause", response_model_exclude_unset=True)
     async def sim_pause(
         printer_id: str, tag: str | None = None, line: int | None = None
     ) -> SimPauseResult:
@@ -405,7 +408,7 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
         orch = _armed_orchestrator(b, printer_id)
         if tag is not None:
             event = PauseEvent(printer_id=printer_id, reason=PauseReason.CHANGE, tag=tag)
-            injected = SimPauseResult(printer_id=printer_id, tag=tag)
+            injected = SimPauseResult(injected="pause", printer_id=printer_id, tag=tag)
         else:
             if line is None:
                 if orch.done:
@@ -418,7 +421,7 @@ def create_app(brain: Brain | None = None, *, simulate: bool = True) -> FastAPI:
             event = PauseEvent(
                 printer_id=printer_id, reason=PauseReason.UNKNOWN, tag=None, line=line
             )
-            injected = SimPauseResult(printer_id=printer_id, line=line)
+            injected = SimPauseResult(injected="pause", printer_id=printer_id, line=line)
         # Don't await: on_pause runs the whole swap, which blocks on the human prompt. Fire it
         # onto the loop and return so the client can answer prompts + trip the sensor.
         task = asyncio.create_task(b.events.publish(event))

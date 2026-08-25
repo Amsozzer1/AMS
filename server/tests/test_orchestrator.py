@@ -366,9 +366,9 @@ async def test_module_resolver_overrides_registry():
         printer_id=PRINTER_ID,
         sense_timeout_s=2.0,
         sense_poll_s=0.01,
-        module_resolver=lambda idx: registry.by_id("mod-c")
-        if idx == 1
-        else registry.for_filament_index(idx),
+        module_resolver=lambda idx: (
+            registry.by_id("mod-c") if idx == 1 else registry.for_filament_index(idx)
+        ),
     )
     orch.subscribe()
 
