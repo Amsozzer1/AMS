@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """v0.2 keystone spike — drive the A1 filament-change routine on the REAL printer.
 
-This is the make-or-break test (spikes/README.md item #3): can we unload / load / resume an
+This is the make-or-break live check (docs/09 UNVERIFIED #3): can we unload / load / resume an
 external-spool color change over local MQTT? It connects to the real printer from
 ``server/config/ams.local.yaml`` (the A1 mini "Bedroom"), streams its live report, and lets you
 fire each change command ONE AT A TIME with a confirmation — so you watch the printer and record
@@ -30,8 +30,8 @@ SAFETY — this physically actuates a real printer:
 Run it from the server venv (has amsx + paho):
 
     cd server
-    uv run python ../spikes/a1_change_routine.py
-    uv run python ../spikes/a1_change_routine.py --printer Bedroom
+    uv run python scripts/check_a1_change_routine.py
+    uv run python scripts/check_a1_change_routine.py --printer Bedroom
 """
 
 from __future__ import annotations
@@ -52,11 +52,7 @@ DEFAULT_CONFIG = REPO / "server" / "config" / "ams.local.yaml"
 
 
 def _status_line(printer: Printer) -> str:
-    p = (
-        printer.state.raw.get("print", {})
-        if isinstance(printer.state.raw, dict)
-        else {}
-    )
+    p = printer.state.raw.get("print", {}) if isinstance(printer.state.raw, dict) else {}
     p = p if isinstance(p, dict) else {}
     return (
         f"stage={printer.state.stage} "
@@ -135,9 +131,7 @@ async def run(config_path: Path, printer_id: str | None) -> int:
     events.subscribe(SensorEvent, on_sensor)
     events.subscribe(FaultEvent, on_fault)
 
-    await (
-        printer.connect()
-    )  # registers report handler + requests the full state (pushall)
+    await printer.connect()  # registers report handler + requests the full state (pushall)
     await asyncio.sleep(1.5)  # let the first full report land
     print("connected. " + _status_line(printer))
 
@@ -153,13 +147,9 @@ async def run(config_path: Path, printer_id: str | None) -> int:
                 print("  " + _status_line(printer))
             elif choice == "2":
                 t = await _ask("  nozzle target °C [220]: ") or "220"
-                await _confirm_send(
-                    link, f"heat nozzle to {t}C", driver._gcode(f"M104 S{t}")
-                )
+                await _confirm_send(link, f"heat nozzle to {t}C", driver._gcode(f"M104 S{t}"))
             elif choice == "3":
-                await _confirm_send(
-                    link, "UNLOAD (Bambu routine)", driver.request_unload()
-                )
+                await _confirm_send(link, "UNLOAD (Bambu routine)", driver.request_unload())
             elif choice == "4":
                 await _confirm_send(
                     link,
@@ -167,13 +157,9 @@ async def run(config_path: Path, printer_id: str | None) -> int:
                     driver._gcode("G1 E-5 F1000", "G1 E-100 F1000"),
                 )
             elif choice == "5":
-                await _confirm_send(
-                    link, "LOAD (raw extrude)", driver.request_extrude()
-                )
+                await _confirm_send(link, "LOAD (raw extrude)", driver.request_extrude())
             elif choice == "6":
-                await _confirm_send(
-                    link, "RESUME print", driver.request_confirm_resume()
-                )
+                await _confirm_send(link, "RESUME print", driver.request_confirm_resume())
             elif choice == "7":
                 pause = {"print": {"sequence_id": "0", "command": "pause", "param": ""}}
                 await _confirm_send(link, "PAUSE print", pause)
@@ -195,14 +181,8 @@ async def run(config_path: Path, printer_id: str | None) -> int:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(
-        description="Drive the A1 change routine on the real printer."
-    )
-    ap.add_argument(
-        "--config", type=Path, default=DEFAULT_CONFIG, help=f"default {DEFAULT_CONFIG}"
-    )
-    ap.add_argument(
-        "--printer", default=None, help="printer id (default: first in config)"
-    )
+    ap = argparse.ArgumentParser(description="Drive the A1 change routine on the real printer.")
+    ap.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help=f"default {DEFAULT_CONFIG}")
+    ap.add_argument("--printer", default=None, help="printer id (default: first in config)")
     args = ap.parse_args()
     raise SystemExit(asyncio.run(run(args.config, args.printer)))

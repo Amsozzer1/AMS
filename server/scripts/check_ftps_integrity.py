@@ -11,7 +11,7 @@ show it). This round-trips real-sized payloads through OUR FtpsClient and compar
      download both, compare) — a real sliced job the firmware is known to accept.
 
     cd server
-    uv run python ../spikes/ftps_integrity.py
+    uv run python scripts/check_ftps_integrity.py
 """
 
 from __future__ import annotations
@@ -117,9 +117,7 @@ async def main() -> int:
     try:
         ftp.cwd("/cache")
         names = ftp.nlst()
-        sample = next(
-            (n for n in names if n.endswith(".3mf") and not n.startswith("amsx")), None
-        )
+        sample = next((n for n in names if n.endswith(".3mf") and not n.startswith("amsx")), None)
         real = _download(ftp, sample) if sample else None
     finally:
         ftp.quit()

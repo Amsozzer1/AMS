@@ -302,9 +302,10 @@ class _ImplicitFTPTLS(ftplib.FTP_TLS):
         # handshake on the data socket — and Bambu's FTPS server never answers the close_notify,
         # so ``unwrap()`` blocks until the socket timeout and raises ``TimeoutError`` ("read
         # operation timed out") EVEN THOUGH the file already committed and the server already
-        # sent 226. Verified live on the A1 mini (spikes/ftps_diag.py): a plain socket close
-        # commits the upload and returns 226 in ~0.1s. The data channel is still TLS (via our
-        # session-reusing ``ntransfercmd``) — we only drop the redundant TLS *shutdown*.
+        # sent 226. Verified live on the A1 mini (see scripts/check_ftps_integrity.py): a
+        # plain socket close commits the upload and returns 226 in ~0.1s. The data channel is
+        # still TLS (via our session-reusing ``ntransfercmd``) — we only drop the redundant
+        # TLS *shutdown*.
         self.voidcmd("TYPE I")
         with self.transfercmd(cmd, rest) as conn:
             while True:

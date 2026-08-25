@@ -6,7 +6,7 @@ Unlike a1_vt_tray.py (which hand-built the payload), this drives the *production
 to prove the wired code reads the base colour and sets the printer's external filament correctly.
 Sets a distinctive test colour, reads it back through the driver, then restores the original.
 
-    cd server && uv run python ../spikes/a1_vt_tray_wired.py
+    cd server && uv run python scripts/check_a1_vt_tray.py
 """
 
 from __future__ import annotations
@@ -82,9 +82,7 @@ print(f"READ-BACK: material={mat} color={col}")
 ok = col == TEST
 
 print(f"RESTORE -> {base_col}…")
-c.publish(
-    REQ, json.dumps(drv.request_set_external_filament(base_mat or "PLA", base_col))
-)
+c.publish(REQ, json.dumps(drv.request_set_external_filament(base_mat or "PLA", base_col)))
 time.sleep(2.5)
 fmat, fcol = _read()
 print(f"RESTORED: material={fmat} color={fcol}")
