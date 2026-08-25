@@ -20,7 +20,7 @@ services:
   #   restart: unless-stopped
   #   depends_on: [mosquitto]
   #   ports:
-  #     - "8000:8000"          # FastAPI dashboard + 3MF upload
+  #     - "9001:9001"          # FastAPI dashboard + 3MF upload
   #   volumes:
   #     - ../server/config:/app/config:ro   # ams.local.json (gitignored)
   #   # network_mode: host     # may be needed for LAN discovery / printer FTPS

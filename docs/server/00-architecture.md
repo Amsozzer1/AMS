@@ -148,7 +148,7 @@ does not serve them. `simulate=True` exposes 16 paths, `simulate=False` exposes 
 All from `server/`.
 
 ```bash
-uv run amsx                  # start (simulate mode, 127.0.0.1:8000)
+uv run amsx                  # start (simulate mode, 127.0.0.1:9001)
 AMSX_RELOAD=1 uv run amsx    # + hot reload
 uv run pytest                # 138 tests, ~3s, no hardware
 uv run ruff check . && uv run ruff format .
