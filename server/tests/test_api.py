@@ -9,8 +9,8 @@ import zipfile
 from fastapi.testclient import TestClient
 
 from amsx.api import create_app
-from amsx.brain import Brain
 from amsx.config import Config, ModuleConfig, PrinterConfig
+from amsx.system.brain import Brain
 
 
 def _sim_brain() -> Brain:

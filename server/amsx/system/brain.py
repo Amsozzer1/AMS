@@ -26,18 +26,11 @@ from amsx.apps.printer.drivers import A1Driver, PrinterDriver, X1P1Driver
 from amsx.apps.prompt import PromptBroker
 from amsx.config import Config, load_config
 from amsx.events import EventBus, FinishedEvent
-from amsx.transport import (
-    FtpClient,
-    FtpsClient,
-    MqttBus,
-    MqttPrinterLink,
-    PrinterLink,
-    SimulatedFtpClient,
-    SimulatedPrinterLink,
-)
-from amsx.types import ModuleId, PrinterId
+from amsx.system.infra.ftps import FtpsClient, SimulatedFtpClient
+from amsx.system.infra.mqtt import MqttBus, MqttPrinterLink, SimulatedPrinterLink
+from amsx.types import FtpClient, ModuleId, PrinterId, PrinterLink
 
-log = logging.getLogger("amsx.brain")
+log = logging.getLogger("amsx.system.brain")
 
 
 def default_config_path() -> Path:

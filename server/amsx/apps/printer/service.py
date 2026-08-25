@@ -3,7 +3,7 @@
 ``Printer`` is the live model of one machine. On ``connect()`` it pulls the FULL report once
 to seed ``PrinterState``, then applies incremental DELTAS as each report arrives, emitting
 typed ``PauseEvent`` / ``SensorEvent`` on the ``EventBus`` when the fields the Orchestrator
-cares about change. It satisfies ``amsx.protocols.PrinterControl`` so the Orchestrator can use
+cares about change. It satisfies ``amsx.types.PrinterControl`` so the Orchestrator can use
 it through that Protocol (real MQTT or simulator, X1/P1 or A1 — all hidden).
 
 **Single-brain:** ``PrinterState.loaded_filament`` is **Pi-authoritative**. The report is
@@ -22,8 +22,7 @@ import logging
 from amsx.apps.printer.drivers import PrinterDriver
 from amsx.enums import PauseReason, PrinterStage
 from amsx.events import EventBus, FaultEvent, FinishedEvent, PauseEvent, SensorEvent
-from amsx.transport import FtpClient, PrinterLink, Report
-from amsx.types import FilamentRef, PrinterId
+from amsx.types import FilamentRef, FtpClient, PrinterId, PrinterLink, Report
 
 log = logging.getLogger("amsx.apps.printer")
 

@@ -26,7 +26,7 @@ import tempfile
 from pathlib import Path
 
 from amsx.config import load_config
-from amsx.transport import FtpsClient, _ImplicitFTPTLS
+from amsx.system.infra.ftps import FtpsClient, _ImplicitFTPTLS
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG = REPO / "server" / "config" / "ams.local.json"

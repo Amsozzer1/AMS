@@ -30,7 +30,7 @@ def _brain_with_store(spools: list[Spool] | None = None):
             ModuleConfig(id="m2", cluster_id="c", filament_index=1),
         ],
     )
-    from amsx.brain import Brain
+    from amsx.system.brain import Brain
 
     brain = Brain(config, simulate=True)
     brain.store = FakeSpoolStore(spools or [])

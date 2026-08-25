@@ -43,9 +43,9 @@ from amsx.api.models import (
 )
 from amsx.apps.orchestration import Orchestrator
 from amsx.apps.printer import Printer
-from amsx.brain import Brain, build_brain
 from amsx.enums import PauseReason
 from amsx.events import PauseEvent, SensorEvent
+from amsx.system.brain import Brain, build_brain
 from amsx.types import SpoolSpec
 
 log = logging.getLogger("amsx.api")

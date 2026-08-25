@@ -30,7 +30,7 @@ dev = [
 ]
 
 [project.scripts]
-amsx = "amsx.__main__:main"     # entrypoint placeholder (Brain.start) — not yet implemented
+amsx = "amsx.system.__main__:main"   # `uv run amsx` -> system/__main__.py
 
 [build-system]
 requires = ["hatchling"]
@@ -70,9 +70,9 @@ name = "amsx layers: nothing imports upward"
 type = "layers"
 layers = [
     "amsx.api",
-    "amsx.brain",
+    "amsx.system.brain",
     "amsx.apps",
-    "amsx.transport | amsx.libs",
+    "amsx.system.infra | amsx.libs",
     "amsx.events",
     "amsx.types",
     "amsx.enums | amsx.errors | amsx.utils | amsx.config",
@@ -95,8 +95,7 @@ type = "forbidden"
 source_modules = ["amsx.apps.orchestration"]
 forbidden_modules = [
     "amsx.apps.printer",
-    "amsx.transport",
+    "amsx.system",
     "amsx.libs",
-    "amsx.brain",
     "amsx.api",
 ]

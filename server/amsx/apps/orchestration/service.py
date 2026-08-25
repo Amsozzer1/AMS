@@ -16,7 +16,7 @@ Three pieces:
   cursor. An untagged / mismatched pause, a fault, or a disconnect is a safe-hold + alert —
   never a swap, never a guess.
 
-Hard rule honored here: we depend ONLY on the `amsx.protocols.Module` / `PrinterControl`
+Hard rule honored here: we depend ONLY on the `amsx.types.Module` / `PrinterControl`
 Protocols — never a concrete printer/driver/HardwareModule. Async throughout; nothing blocks
 the event loop.
 """

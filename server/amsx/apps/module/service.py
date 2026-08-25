@@ -3,7 +3,7 @@ cluster that resolve and serialize module motion.
 
 Design source: docs/06-module-interface.md (the `Module` contract + `ManualModule`) and
 docs/10-domain-model.md (`ModuleRegistry`, `Cluster`). We depend on the SHARED `Module`
-Protocol in `amsx.protocols` and never redefine it: `ManualModule` (and a future
+Protocol in `amsx.types` and never redefine it: `ManualModule` (and a future
 `HardwareModule`) are structurally interchangeable so the orchestrator never changes.
 
 `ManualModule` makes each motion call a PROMPT to a human. The prompt mechanism is injectable
@@ -39,7 +39,7 @@ async def _stdin_prompter(message: str) -> str:
 
 
 class ManualModule:
-    """v0 module: a human performs every motion. Implements `amsx.protocols.Module`.
+    """v0 module: a human performs every motion. Implements `amsx.types.Module`.
 
     Each call turns into a prompt and waits for the human (or the injected auto-answerer). The
     module tracks only its `id` and `state` per the docs/06 state machine — nothing else.

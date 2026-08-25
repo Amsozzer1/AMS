@@ -13,9 +13,9 @@ import pytest
 from amsx.apps.inventory import FakeSpoolStore
 from amsx.apps.inventory.resolver import ProposedRow
 from amsx.apps.orchestration import Orchestrator
-from amsx.brain import Brain
 from amsx.config import Config, ModuleConfig, PrinterConfig
 from amsx.events import FinishedEvent
+from amsx.system.brain import Brain
 from amsx.types import FilamentColor, PlannedSwap, Spool, SwapPlan
 
 pytestmark = pytest.mark.asyncio

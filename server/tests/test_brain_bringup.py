@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from amsx import brain as brain_mod
-from amsx.brain import Brain
 from amsx.config import Config, PrinterConfig
+from amsx.system import brain as brain_mod
+from amsx.system.brain import Brain
 
 pytestmark = pytest.mark.asyncio
 

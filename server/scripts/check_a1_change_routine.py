@@ -45,7 +45,7 @@ from amsx.apps.printer import Printer
 from amsx.apps.printer.drivers import A1Driver
 from amsx.config import load_config
 from amsx.events import EventBus, FaultEvent, PauseEvent, SensorEvent
-from amsx.transport import MqttBus, MqttPrinterLink
+from amsx.system.infra.mqtt import MqttBus, MqttPrinterLink
 
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = REPO / "server" / "config" / "ams.local.json"
