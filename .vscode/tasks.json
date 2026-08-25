@@ -23,7 +23,7 @@
         "env": {
           "AMSX_SIMULATE": "1",
           "AMSX_RELOAD": "1",
-          "AMSX_CONFIG": "config/ams.sim.yaml",
+          "AMSX_CONFIG": "config/ams.sim.json",
           "AMSX_HOST": "127.0.0.1",
           "AMSX_PORT": "9001",
           "AMSX_CORS_ORIGINS": "http://localhost:9000,http://127.0.0.1:9000"
@@ -47,7 +47,7 @@
     },
     {
       "label": "Backend: Brain (real printer, watch)",
-      "detail": "Run the Brain on :9001 against the REAL A1 mini (ams.local.yaml) with hot-reload. Needs the printer on the LAN. Holds the printer's MQTT connection — stop this before running scripts/check_a1_change_routine.py (only one MQTT client at a time).",
+      "detail": "Run the Brain on :9001 against the REAL A1 mini (ams.local.json) with hot-reload. Needs the printer on the LAN. Holds the printer's MQTT connection — stop this before running scripts/check_a1_change_routine.py (only one MQTT client at a time).",
       "type": "shell",
       "command": "uv sync --extra dev && uv run amsx",
       "options": {
@@ -55,7 +55,7 @@
         "env": {
           "AMSX_SIMULATE": "0",
           "AMSX_RELOAD": "1",
-          "AMSX_CONFIG": "config/ams.local.yaml",
+          "AMSX_CONFIG": "config/ams.local.json",
           "AMSX_HOST": "127.0.0.1",
           "AMSX_PORT": "9001",
           "AMSX_CORS_ORIGINS": "http://localhost:9000,http://127.0.0.1:9000"

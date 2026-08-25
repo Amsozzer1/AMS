@@ -30,8 +30,10 @@ htmlcov/
 # ---- Secrets / local config (never commit real printer access codes / serials) ----
 *.local.yaml
 *.local.yml
+*.local.json
 *.secret.yaml
 *.secret.yml
+*.secret.json
 .env
 .env.*
 !.env.example

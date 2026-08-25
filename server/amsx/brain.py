@@ -42,13 +42,13 @@ log = logging.getLogger("amsx.brain")
 
 
 def default_config_path() -> Path:
-    """AMSX_CONFIG, else config/ams.local.yaml if present, else the committed example."""
+    """AMSX_CONFIG, else config/ams.local.json if present, else the committed example."""
     env = os.getenv("AMSX_CONFIG")
     if env:
         return Path(env)
-    here = Path(__file__).resolve().parents[2]  # .../server
-    local = here / "config" / "ams.local.yaml"
-    return local if local.exists() else here / "config" / "ams.example.yaml"
+    here = Path(__file__).resolve().parents[1]  # .../server
+    local = here / "config" / "ams.local.json"
+    return local if local.exists() else here / "config" / "ams.example.json"
 
 
 def _make_driver(model: str) -> PrinterDriver:

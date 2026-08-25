@@ -21,7 +21,7 @@ import paho.mqtt.client as mqtt
 from amsx.config import load_config
 from amsx.printer.drivers import A1Driver
 
-pc = load_config("config/ams.local.yaml").printers[0]
+pc = load_config("config/ams.local.json").printers[0]
 drv = A1Driver()
 REQ = f"device/{pc.serial}/request"
 REP = f"device/{pc.serial}/report"

@@ -28,5 +28,5 @@ uv run ty check          # type-check
 uv run pytest            # tests
 ```
 
-Copy `config/ams.example.yaml` → `config/ams.local.yaml` and fill in your printer serial +
+Copy `config/ams.example.json` → `config/ams.local.json` and fill in your printer serial +
 access code (LAN mode). `*.local.yaml` is gitignored — never commit real access codes.

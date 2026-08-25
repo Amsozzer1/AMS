@@ -6,15 +6,15 @@ codes / serials** (and later any Spoolman/remote-access tokens). They must never
 ## Where secrets live (all gitignored)
 | Secret | Put it in | Ignored by |
 |---|---|---|
-| Printer serial + access code | `server/config/ams.local.yaml` **or** `.env` | `*.local.yaml`, `.env` |
+| Printer serial + access code | `server/config/ams.local.json` **or** `.env` | `*.local.json`, `.env` |
 | WiFi creds (firmware) | PlatformIO build flags from an untracked file | `.env`, build-flag file |
 | Any keys/certs | `secrets/` | `secrets/`, `*.pem`, `*.key` |
 
-Committed files use **placeholders only** (`REPLACE_ME`): `server/config/ams.example.yaml`,
+Committed files use **placeholders only** (`REPLACE_ME`): `server/config/ams.example.json`,
 `.env.example`.
 
 ## Defense in depth (active now)
-1. **`.gitignore`** excludes `*.local.yaml`, `.env`, `secrets/`, keys/certs.
+1. **`.gitignore`** excludes `*.local.json`, `.env`, `secrets/`, keys/certs.
 2. **pre-commit + gitleaks** — `.pre-commit-config.yaml` scans every commit and **blocks**
    anything that looks like a secret (plus `detect-private-key`). Enable once:
    ```bash

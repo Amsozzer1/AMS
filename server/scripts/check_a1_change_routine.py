@@ -3,7 +3,7 @@
 
 This is the make-or-break live check (docs/09 UNVERIFIED #3): can we unload / load / resume an
 external-spool color change over local MQTT? It connects to the real printer from
-``server/config/ams.local.yaml`` (the A1 mini "Bedroom"), streams its live report, and lets you
+``server/config/ams.local.json`` (the A1 mini "Bedroom"), streams its live report, and lets you
 fire each change command ONE AT A TIME with a confirmation — so you watch the printer and record
 what actually happens. It calls the real ``Printer`` + ``A1Driver`` utilities (Option A: ride
 Bambu's own routine), so a "PASS" here is a payload we can trust and the @todo notes come off.
@@ -48,7 +48,7 @@ from amsx.printer.drivers import A1Driver
 from amsx.transport import MqttBus, MqttPrinterLink
 
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG = REPO / "server" / "config" / "ams.local.yaml"
+DEFAULT_CONFIG = REPO / "server" / "config" / "ams.local.json"
 
 
 def _status_line(printer: Printer) -> str:
