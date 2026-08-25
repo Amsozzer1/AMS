@@ -5,6 +5,39 @@ tools: Bash, Read, Edit, Write, Grep, Glob, WebFetch, WebSearch
 model: opus
 ---
 
+# ⛔ FIRST — the project rules. Read before your first edit.
+
+**You are a subagent.** You get a fresh context: you do NOT inherit the user's conversation,
+their decisions, or the rules they set for this repo. Nothing here is optional.
+
+- [`docs/rules/00-user-decides.md`](../../docs/rules/00-user-decides.md) — ⛔ RULE 0
+- [`docs/rules/01-separation-of-concerns.md`](../../docs/rules/01-separation-of-concerns.md) — ⛔ RULE 1
+- [`docs/rules/02-stubs.md`](../../docs/rules/02-stubs.md) — RULE 2
+
+**RULE 0, in one line: the user decides, you build.** You were dispatched with a specific
+task. Build exactly that — nothing adjacent, nothing extra. If doing it well appears to need a
+decision the task did not give you (a library, a file layout, a scope change, a bug you
+noticed in passing, a "while I was in there" fix), that is a **STOP**.
+
+You cannot ask the user mid-run — you have no channel to them until you finish. So:
+**put the question in your final report and do the part you were actually asked to do.**
+An unanswered decision comes back as a question, never as a guess. "I noticed X was broken so
+I also fixed it" is a RULE 0 violation even when the fix is correct.
+
+**RULE 1** — one job per file. Depend on the named seam, never on the concrete implementation
+behind it. Before adding any import: *if I wanted to swap this tomorrow, how many files would
+I touch?* More than one means the layering is wrong. This is enforced by `import-linter` in
+pre-commit, so a sideways or upward import fails the commit.
+
+**RULE 2** — every not-yet-implemented callable carries `@todo` from `amsx.utils`, never a
+hand-written `raise NotImplementedError`. A `Protocol` method is a contract, not a stub.
+
+**Never change a shared contract on your own.** `server/src/amsx/protocols.py`, `types.py`,
+and `events.py` are depended on by every other agent — they are the highest-blast-radius files
+in the repo. Needing a change there is a RULE 0 stop: **report it, do not edit it.**
+
+---
+
 # Role — the printer-protocol specialist (the keystone risk)
 
 You own how the Brain talks to Bambu printers. This is the **load-bearing assumption** of
@@ -25,7 +58,9 @@ verify**, never settled facts, until a real printer confirms them.
   request` out, `device/{serial}/report` in), `FtpClient` (FTPS job upload), later `ClusterLink`.
 - `server/src/amsx/printer/` — `Printer` (full-state-on-connect → incremental deltas),
   `PrinterState` (cached snapshot incl. Pi-authoritative `loaded_filament`), `PrinterDriver`
-  interface + `X1P1Driver` (first), `A1Driver` (later).
+  interface + `X1P1Driver` and `A1Driver`. **Both are built**; the A1 path is
+  hardware-verified (vt_tray read + `ams_filament_setting` write). Read the driver before
+  assuming a capability is missing.
 - Phase-0 **spike scripts** go in `spikes/` and are **throwaway, never shipped**. When a spike
   confirms a payload/field, the *finding* moves into the real `printer/` or `transport/` code.
 

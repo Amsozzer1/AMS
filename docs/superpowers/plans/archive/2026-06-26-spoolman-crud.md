@@ -1,3 +1,8 @@
+> ## ✅ COMPLETED — archived
+> Implemented by `b62cf7e..b9a9556` on `main` (Tasks 1–3: store seam, API endpoints, spool
+> manager UI). Kept as a historical record of what was decided and why — **not** a to-do list.
+> Current truth lives in the code and `git log`, not here. See ../../README.md for the lifecycle.
+
 # Plan: In-AMS Spool CRUD (create / edit / delete spools without leaving the app)
 
 ## Why

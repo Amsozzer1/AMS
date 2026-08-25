@@ -15,6 +15,18 @@ Proposing is encouraged; acting without explicit approval is a violation.
 > Before every edit: *did the user explicitly tell me to do **this specific thing**?*
 > **No → stop and ask.**
 
+**Requires explicit approval, every time — no exceptions for size, proximity, or obviousness:**
+creating/editing/deleting/moving **any** file · adding or upgrading **any** dependency ·
+changing architecture, naming, or a public interface · refactoring, cleanup, or a
+"while I was in there" fix · any `git` write (commit, branch, push, history).
+
+**Allowed without asking:** reading, searching, running tests/linters/typecheckers, and
+presenting options.
+
+Approval never generalises — a yes to one thing is not a yes to the next.
+The eight rationalizations that look like exceptions but aren't are in
+[the rule](docs/rules/00-user-decides.md); read it before you argue with this.
+
 ## ⛔ RULE 1 — [Separation of concerns](docs/rules/01-separation-of-concerns.md)
 
 One job per file. Every layer depends on the layer below through a **named seam**, never

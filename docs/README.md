@@ -48,6 +48,12 @@ The rules Claude operates under. Indexed from [CLAUDE.md](../CLAUDE.md), loaded 
 | [frontend/00-architecture.md](frontend/00-architecture.md) | Folder architecture — views, `_components`, `_helpers`, the index-as-door rule |
 | [frontend/01-api-layer.md](frontend/01-api-layer.md) | The `api/` module, the transport seam, and generated types |
 
+## Workflow
+
+| Doc | What it covers |
+|-----|----------------|
+| [superpowers/README.md](superpowers/README.md) | The spec → plan → execute → archive loop, the pinned plugin, and the plan lifecycle |
+
 ## Locked decisions (so far)
 
 1. **Target printers:** X1/P1 **and** A1 — via a printer-abstraction layer. X1/P1 first.

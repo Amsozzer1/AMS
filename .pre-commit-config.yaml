@@ -19,6 +19,17 @@ repos:
       - id: check-yaml
       - id: check-merge-conflict
 
+  # --- RULE 1: layering enforced mechanically, not by review ---
+  # docs/rules/01-separation-of-concerns.md. Contracts live in server/pyproject.toml.
+  - repo: local
+    hooks:
+      - id: import-linter
+        name: import-linter (RULE 1 — no sideways/upward imports)
+        entry: bash -c 'cd server && uv run lint-imports'
+        language: system
+        files: ^server/src/amsx/.*\.py$
+        pass_filenames: false
+
   # --- Python lint + format (server/) ---
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.4

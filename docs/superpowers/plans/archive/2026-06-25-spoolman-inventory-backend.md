@@ -1,6 +1,11 @@
+> ## ✅ COMPLETED — archived
+> Implemented by `45b5363..966a4f7` on `main` (Tasks 1–5, plus the resolver/API/orchestration
+> follow-ons). Kept as a historical record of what was decided and why — **not** a to-do list.
+> Current truth lives in the code and `git log`, not here. See ../../README.md for the lifecycle.
+
 # Spoolman Inventory — Backend Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Give the Brain color-aware swaps — read a sliced job's color plan, resolve each color to a loaded module via a (soft) Spoolman inventory, expose a mapping/assignment API, sync the printer's external-spool filament, and decrement usage.
 
@@ -36,7 +41,7 @@
   - `PlannedSwap` gains `material: str | None = None`, `color_hex: str | None = None`.
   - `SwapPlan` gains `base: FilamentColor | None = None` and `colors: list[FilamentColor] = field(default_factory=list)` (distinct used filaments, base first).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # server/tests/test_types_config.py
@@ -71,12 +76,12 @@ def test_plan_carries_colors():
     assert len(plan.colors) == 2
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_types_config.py -v`
 Expected: FAIL (ImportError: cannot import name `SpoolmanConfig` / `Spool`).
 
-- [ ] **Step 3: Implement the types**
+- [x] **Step 3: Implement the types**
 
 In `server/src/amsx/types.py`, add to the value-objects section:
 
@@ -135,12 +140,12 @@ class SpoolmanConfig(BaseModel):
 
 and add to `Config`: `spoolman: SpoolmanConfig = Field(default_factory=SpoolmanConfig)`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd server && uv run pytest tests/test_types_config.py -v && uv run ruff check src/ tests/`
 Expected: PASS, lint clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/amsx/types.py server/src/amsx/config/__init__.py server/tests/test_types_config.py
@@ -169,7 +174,7 @@ git commit -m "feat(types): Spool/FilamentColor inventory value objects + Spoolm
   ```
   and `FakeSpoolStore(spools: list[Spool] | None = None)` implementing it in-memory (used by every other task's tests).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # server/tests/test_inventory_fake.py
@@ -213,12 +218,12 @@ async def test_consume_decrements():
     assert (await s.get_spool("2")).remaining_g == 300
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_inventory_fake.py -v`
 Expected: FAIL (module `amsx.inventory` not found).
 
-- [ ] **Step 3: Implement the Protocol + fake**
+- [x] **Step 3: Implement the Protocol + fake**
 
 ```python
 # server/src/amsx/inventory/__init__.py
@@ -288,12 +293,12 @@ class FakeSpoolStore:
         return None
 ```
 
-- [ ] **Step 4: Run tests + lint**
+- [x] **Step 4: Run tests + lint**
 
 Run: `cd server && uv run pytest tests/test_inventory_fake.py -v && uv run ruff check src/`
 Expected: PASS, clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/amsx/inventory/__init__.py server/tests/test_inventory_fake.py
@@ -315,13 +320,13 @@ git commit -m "feat(inventory): SpoolStore protocol + FakeSpoolStore"
   `Spool` (`material`/`color_hex` from the nested `filament`, `module` from `extra.ams_module`
   JSON-decoded). All HTTP wrapped: on any error → log + empty/None (SOFT).
 
-- [ ] **Step 1: Add the dependency**
+- [x] **Step 1: Add the dependency**
 
 In `server/pyproject.toml` add `"httpx>=0.27"` to `[project].dependencies`, then:
 
 Run: `cd server && uv sync`
 
-- [ ] **Step 2: Write the failing test (httpx MockTransport — no live Spoolman)**
+- [x] **Step 2: Write the failing test (httpx MockTransport — no live Spoolman)**
 
 ```python
 # server/tests/test_inventory_spoolman.py
@@ -373,12 +378,12 @@ async def test_errors_are_soft():
     assert await _store(handler).loaded_in("m2") is None
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_inventory_spoolman.py -v`
 Expected: FAIL (module not found).
 
-- [ ] **Step 4: Implement `SpoolmanStore`**
+- [x] **Step 4: Implement `SpoolmanStore`**
 
 ```python
 # server/src/amsx/inventory/spoolman.py
@@ -504,7 +509,7 @@ class SpoolmanStore:
             log.warning("Spoolman ensure_module_field failed (soft)", exc_info=True)
 ```
 
-- [ ] **Step 5: Run tests + lint, commit**
+- [x] **Step 5: Run tests + lint, commit**
 
 Run: `cd server && uv run pytest tests/test_inventory_spoolman.py -v && uv run ruff check src/`
 Expected: PASS.
@@ -531,7 +536,7 @@ git commit -m "feat(inventory): SpoolmanStore httpx client (soft) with extra.ams
   colours, ordered changes as `(index, material, color_hex)`). Counts validated against the
   `M400 U1` pauses; on mismatch the colour fields stay `None`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # server/tests/test_job_colorplan.py
@@ -587,12 +592,12 @@ def test_colorplan_absent_degrades(tmp_path):
     assert plan.swaps[0].color_hex is None and plan.base is None
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_job_colorplan.py -v`
 Expected: FAIL (plan has no `.base`, colour fields None / AttributeError).
 
-- [ ] **Step 3: Implement the color-plan parse**
+- [x] **Step 3: Implement the color-plan parse**
 
 First add the XXE-safe XML dep: add `"defusedxml>=0.7"` to `server/pyproject.toml` `[project].dependencies` and run `cd server && uv sync`. Then in `server/src/amsx/job/__init__.py` add imports and helpers, and weave colours into the result.
 
@@ -690,12 +695,12 @@ Then change `JobParser.parse` to open the zip once, build the swap plan from the
 
 (Keep `_plan_from_gcode` as-is; the colour binding replaces each `PlannedSwap` with a coloured copy.)
 
-- [ ] **Step 4: Run tests + the existing parser tests + lint**
+- [x] **Step 4: Run tests + the existing parser tests + lint**
 
 Run: `cd server && uv run pytest tests/test_job_parser.py tests/test_job_colorplan.py -v && uv run ruff check src/`
 Expected: PASS (existing parser tests still green — they have no metadata so colours stay None).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/amsx/job/__init__.py server/tests/test_job_colorplan.py
@@ -719,7 +724,7 @@ git commit -m "feat(job): parse 3mf colour plan (custom_gcode_per_layer + filame
   - `Printer.read_external_filament() -> tuple[str | None, str | None]` (from cached `state.raw`).
   - `Printer.set_external_filament(material, color_hex) -> None` (sends via link).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # server/tests/test_vt_tray.py
@@ -739,12 +744,12 @@ def test_set_external_filament_payload():
     assert pr["tray_type"] == "PLA"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_vt_tray.py -v`
 Expected: FAIL (no `parse_external_filament`).
 
-- [ ] **Step 3: Implement on A1Driver**
+- [x] **Step 3: Implement on A1Driver**
 
 ```python
     _VT_TRAY = "vt_tray"
@@ -786,7 +791,7 @@ In `server/src/amsx/printer/__init__.py`:
         await self.link.request(self.driver.request_set_external_filament(material, color_hex))
 ```
 
-- [ ] **Step 4: Run tests + lint, commit**
+- [x] **Step 4: Run tests + lint, commit**
 
 Run: `cd server && uv run pytest tests/test_vt_tray.py tests/test_printer_state.py -v && uv run ruff check src/`
 
@@ -811,7 +816,7 @@ git commit -m "feat(printer): vt_tray external-filament read + ams_filament_sett
   spool_id: str | None, status: str)` where `status ∈ {"loaded","gap"}` — `module/spool_id` set when
   a loaded spool matches, else `gap`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # server/tests/test_resolver.py
@@ -839,12 +844,12 @@ async def test_propose_matches_loaded_and_flags_gap():
     assert rows[5].status == "gap" and rows[5].module is None       # blue -> gap
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_resolver.py -v`
 Expected: FAIL (module not found).
 
-- [ ] **Step 3: Implement the resolver**
+- [x] **Step 3: Implement the resolver**
 
 ```python
 # server/src/amsx/inventory/resolver.py
@@ -891,7 +896,7 @@ class Resolver:
         return rows
 ```
 
-- [ ] **Step 4: Run tests + lint, commit**
+- [x] **Step 4: Run tests + lint, commit**
 
 Run: `cd server && uv run pytest tests/test_resolver.py -v && uv run ruff check src/`
 
@@ -919,7 +924,7 @@ git commit -m "feat(inventory): Resolver best-effort index->module proposal"
   - `POST /api/printers/{id}/job/assignment` body `{index: module}` → `{ok: true}` (writes `set_module` for gap rows where a spool was chosen; binds index→module on the orchestrator)
   - `Brain.store: SpoolStore`, `Brain.resolver: Resolver`, `Brain.assignment: dict[PrinterId, dict[int, ModuleId]]`.
 
-- [ ] **Step 1: Write the failing test (FakeSpoolStore injected)**
+- [x] **Step 1: Write the failing test (FakeSpoolStore injected)**
 
 ```python
 # server/tests/test_api_inventory.py
@@ -957,24 +962,24 @@ def test_set_loadout_endpoint():
 
 (If the simulate printer id differs, read it from `GET /api/printers` first — keep the assertion on whatever id the sim config yields.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_api_inventory.py -v`
 Expected: FAIL (`brain.store` missing / 404 on `/api/spools`).
 
-- [ ] **Step 3: Implement brain store + endpoints**
+- [x] **Step 3: Implement brain store + endpoints**
 
 In `brain.py`: in `__init__`, set `self.store`, `self.resolver`, `self.assignment = {}`. In `build_brain`/`_bring_up_*`, choose the store: `FakeSpoolStore()` when `simulate or not config.spoolman.enabled`, else `SpoolmanStore(config.spoolman)`; build `Resolver(self.store)`. In `start()`, `await self.store.ensure_module_field()`. Extend `arm_job` to also compute + cache the proposal (`self.assignment.setdefault(printer_id, {})`), and have the swap path call `printer.set_external_filament(material, color)` after a confirmed swap (wire in the orchestrator alert/consume hook is Task 8).
 
 In `api/__init__.py` add the endpoints from the Interfaces block, serializing `Spool` via a small
 `_spool_dict(s)` helper and reading the module list from `brain.config.modules`.
 
-- [ ] **Step 4: Run the full suite + lint**
+- [x] **Step 4: Run the full suite + lint**
 
 Run: `cd server && uv run pytest -q && uv run ruff check src/ tests/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/amsx/brain.py server/src/amsx/api/__init__.py server/tests/test_api_inventory.py
@@ -994,7 +999,7 @@ git commit -m "feat(api): spool inventory + loadout + job-assignment proxy endpo
 - Consumes: `SpoolStore`, the per-printer `assignment` (index→module), `SwapPlan.colors` grams.
 - Produces: on `gcode_state→FINISH`, for each used index with grams, `store.consume(spool_of(module), grams)` aggregated by spool. Best-effort, SOFT.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # server/tests/test_consume.py
@@ -1015,12 +1020,12 @@ async def test_consume_aggregates_by_spool():
     assert (await store.get_spool("1")).remaining_g == 990
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && uv run pytest tests/test_consume.py -v`
 Expected: FAIL (`consume_plan` not defined).
 
-- [ ] **Step 3: Implement `consume_plan` + wire FINISH**
+- [x] **Step 3: Implement `consume_plan` + wire FINISH**
 
 ```python
 # in server/src/amsx/orchestration/__init__.py
@@ -1043,7 +1048,7 @@ Wire the Brain so that when a printer's stage transitions to `FINISHED`, it call
 with the armed plan, the confirmed `assignment`, and the current loadout (`{module: spool.id}` from
 `store.list_spools()`).
 
-- [ ] **Step 4: Run tests + lint, commit**
+- [x] **Step 4: Run tests + lint, commit**
 
 Run: `cd server && uv run pytest tests/test_consume.py -q && uv run ruff check src/`
 
@@ -1062,7 +1067,7 @@ git commit -m "feat(orchestration): consume spool grams on finish; set external 
 **Interfaces:**
 - Consumes: everything above via `create_app(brain)` with a `FakeSpoolStore` and the simulate path.
 
-- [ ] **Step 1: Write the e2e sim test**
+- [x] **Step 1: Write the e2e sim test**
 
 ```python
 # server/tests/test_inventory_e2e_sim.py
@@ -1075,12 +1080,12 @@ git commit -m "feat(orchestration): consume spool grams on finish; set external 
 `gap`/`loaded` row per colour and that confirming it makes `brain.assignment[printer]` map the
 change index to the chosen module.)
 
-- [ ] **Step 2: Run the whole suite + lint**
+- [x] **Step 2: Run the whole suite + lint**
 
 Run: `cd server && uv run pytest -q && uv run ruff check src/ tests/`
 Expected: ALL PASS, clean.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add server/tests/test_inventory_e2e_sim.py

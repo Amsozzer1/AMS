@@ -1,5 +1,35 @@
 {
   "enabledPlugins": {
-    "code-simplifier@claude-plugins-official": true
+    "code-simplifier@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -fd*)",
+      "Bash(git filter-branch*)",
+      "Bash(git branch -D*)"
+    ],
+    "ask": [
+      "Edit(server/src/amsx/protocols.py)",
+      "Edit(server/src/amsx/types.py)",
+      "Edit(server/src/amsx/events.py)",
+      "Write(server/src/amsx/protocols.py)",
+      "Write(server/src/amsx/types.py)",
+      "Write(server/src/amsx/events.py)",
+      "Bash(npm install*)",
+      "Bash(npm uninstall*)",
+      "Bash(npm i *)",
+      "Bash(uv add*)",
+      "Bash(uv remove*)",
+      "Bash(pip install*)",
+      "Bash(uv pip install*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git merge*)",
+      "Bash(git rebase*)"
+    ]
   }
 }
