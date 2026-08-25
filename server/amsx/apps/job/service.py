@@ -215,10 +215,9 @@ class JobParser:
                     )
                 )
 
-        if not swaps:
-            raise JobParseError(
-                f"{source}: no filament changes (M400 U1) found in {PLATE_GCODE_PATH}"
-            )
+        # An empty plan is NOT an error here: a single-colour job legitimately has no changes.
+        # Whether zero swaps is fine or a mis-slice depends on how many filaments the job uses,
+        # which lives in slice_info.config — so that judgement is made in `parse`, not here.
         return SwapPlan(swaps=swaps)
 
     def parse(self, job: Job) -> SwapPlan:
@@ -255,6 +254,21 @@ class JobParser:
                 )
                 for s, (idx, color) in zip(swaps, changes, strict=True)
             ]
+        # Zero swaps means one of two very different things, and slice_info tells them apart:
+        #
+        #   1 filament,  0 pauses -> a single-colour print. Perfectly valid: the plan is empty,
+        #                            the Orchestrator is `done` from the start (cursor 0 >= 0)
+        #                            and simply never acts on a pause. Upload + print still work.
+        #   2+ filaments, 0 pauses -> the job DOES change colour, but was sliced for the AMS
+        #                            (M620/M621 tool changes) instead of the manual external-spool
+        #                            flow. The printer would swap by itself and AMS-X would sit
+        #                            idle — almost always a slicing mistake, so say so loudly.
+        if not swaps and len(info) > 1:
+            raise JobParseError(
+                f"{path}: {len(info)} filaments but no filament changes (M400 U1) in "
+                f"{PLATE_GCODE_PATH} — this looks sliced for the AMS. Re-slice with the "
+                f"filaments set to External Spool so each change emits M400 U1."
+            )
         base = None
         if base_idx is not None and base_idx in info:
             mat, col, grams = info[base_idx]
