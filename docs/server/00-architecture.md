@@ -33,7 +33,7 @@ Read top to bottom. **Each layer may import anything below it and nothing above 
 | 4 | `system/brain.py` | Composition root — builds and wires every concrete class, once |
 | 5 | `apps/` | The domain: printer · orchestration · job · module · inventory · prompt |
 | 6 | `system/infra/mqtt/` · `system/infra/ftps/` · `libs/` | Adapters to the outside world |
-| 7 | `events/` | `EventBus` + typed event payloads |
+| 7 | `events.py` | `EventBus` + typed event payloads |
 | 8 | `types/` | Value objects, ids, wire shapes, and **every seam** (`protocols.py`) |
 | 9 | `enums/` · `errors/` · `config/` · `utils/` | Leaves. Import nothing from `amsx` |
 
@@ -148,7 +148,7 @@ does not serve them. `simulate=True` exposes 16 paths, `simulate=False` exposes 
 All from `server/`.
 
 ```bash
-uv run amsx                  # start (simulate mode, 127.0.0.1:8000)
+uv run amsx                  # start (simulate mode, 127.0.0.1:9001)
 AMSX_RELOAD=1 uv run amsx    # + hot reload
 uv run pytest                # 138 tests, ~3s, no hardware
 uv run ruff check . && uv run ruff format .
@@ -180,7 +180,7 @@ amsx/
 │   ├── inventory/             service · resolver · view
 │   └── prompt/                service (PromptBroker) · view
 ├── libs/spoolman/             client.py
-├── events/                    EventBus + typed payloads
+├── events.py                  EventBus + typed payloads
 ├── types/                     ids · wire · filament · spool · swap · protocols
 ├── enums/                     printer · module · swap
 ├── errors/                    base · domain · http

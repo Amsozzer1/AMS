@@ -1,8 +1,8 @@
 """`amsx` entrypoint — start the Brain behind the FastAPI app.
 
-    uv run amsx                 # simulate mode (no printer needed) on 127.0.0.1:8000
+    uv run amsx                 # simulate mode (no printer needed) on 127.0.0.1:9001
     AMSX_SIMULATE=0 uv run amsx # real transport (needs a printer + the v0.2 spike confirmed)
-    AMSX_RELOAD=1 uv run amsx   # watch src/ and hot-reload on every change (dev)
+    AMSX_RELOAD=1 uv run amsx   # watch amsx/ and hot-reload on every change (dev)
 
 Env: AMSX_HOST, AMSX_PORT, AMSX_CONFIG, AMSX_SIMULATE, AMSX_RELOAD, AMSX_LOG_LEVEL.
 """
@@ -58,7 +58,9 @@ def main() -> None:
 
     setup_logging()
     host = os.getenv("AMSX_HOST", "127.0.0.1")
-    port = int(os.getenv("AMSX_PORT", "8000"))
+    # 9001, not 8000: 8000 is a heavily contested port (a stray file server, a stray
+    # dev server) and every task/script here already standardises on 9001.
+    port = int(os.getenv("AMSX_PORT", "9001"))
 
     if _truthy("AMSX_RELOAD"):
         # Watch the package source and restart on any .py change (dev — keeps the running

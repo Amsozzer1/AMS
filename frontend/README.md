@@ -44,10 +44,10 @@ NEXT_PUBLIC_API_BASE=http://casaos.local:9001
 ```
 
 Start the Brain in simulate mode (no hardware) to develop against it. The Brain
-defaults to :8000, so run it on :9001 to match the UI default:
+defaults to :9001, which is already the UI default — no env var needed:
 
 ```bash
-cd ../server && AMSX_PORT=9001 uv run amsx
+cd ../server && uv run amsx
 ```
 
 ## Demo the prompt loop without hardware (simulate mode)

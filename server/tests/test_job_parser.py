@@ -17,8 +17,19 @@ from amsx.apps.job import PLATE_GCODE_PATH, Job, JobParseError, JobParser
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _make_3mf(tmp_path: Path, *, plate_gcode: str | None, name: str = "job.gcode.3mf") -> Path:
-    """Zip ``plate_gcode`` into a ``.gcode.3mf`` (omit it for a sliceless 3MF)."""
+def _make_3mf(
+    tmp_path: Path,
+    *,
+    plate_gcode: str | None,
+    name: str = "job.gcode.3mf",
+    filaments: int = 0,
+) -> Path:
+    """Zip ``plate_gcode`` into a ``.gcode.3mf`` (omit it for a sliceless 3MF).
+
+    ``filaments`` writes a ``slice_info.config`` declaring that many filaments. It matters for
+    the zero-swap case: the parser uses the filament COUNT to tell a legitimate single-colour
+    job from one mis-sliced for the AMS. Default 0 omits the file entirely (count unknown).
+    """
     path = tmp_path / name
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
         # Members a real sliced 3MF carries alongside the gcode.
@@ -26,6 +37,12 @@ def _make_3mf(tmp_path: Path, *, plate_gcode: str | None, name: str = "job.gcode
         zf.writestr("Metadata/plate_1.json", "{}")
         if plate_gcode is not None:
             zf.writestr(PLATE_GCODE_PATH, plate_gcode)
+        if filaments:
+            rows = "".join(
+                f'<filament id="{i}" type="PLA" color="#FFFFFF" used_g="10"/>'
+                for i in range(1, filaments + 1)
+            )
+            zf.writestr("Metadata/slice_info.config", f"<config>{rows}</config>")
     return path
 
 
@@ -105,8 +122,8 @@ def test_layer_is_none_without_markers(tmp_path: Path) -> None:
 def test_bare_m400_without_u1_is_not_a_change(tmp_path: Path) -> None:
     gcode = "M1020 S3\nM400\nG1 X1 Y1\n"  # bare M400 = not a swap, and no U1 pause at all
     path = _make_3mf(tmp_path, plate_gcode=gcode)
-    with pytest.raises(JobParseError):
-        JobParser().parse(Job(file=path, printer_id="p1"))
+    plan = JobParser().parse(Job(file=path, printer_id="p1"))
+    assert len(plan) == 0  # the bare M400 was correctly not counted as a change
 
 
 def test_comments_and_whitespace_are_ignored(tmp_path: Path) -> None:
@@ -136,9 +153,35 @@ def test_error_on_missing_file(tmp_path: Path) -> None:
         JobParser().parse(Job(file=tmp_path / "nope.gcode.3mf", printer_id="p1"))
 
 
-def test_error_when_no_changes(tmp_path: Path) -> None:
-    path = _make_3mf(tmp_path, plate_gcode="G28\nG1 X1 Y1 E1\nM104 S0\n")
-    with pytest.raises(JobParseError, match="no filament changes"):
+_NO_CHANGE_GCODE = "G28\nG1 X1 Y1 E1\nM104 S0\n"
+
+
+def test_single_colour_job_is_valid_with_an_empty_plan(tmp_path: Path) -> None:
+    """One filament and no M400 U1 is a normal single-colour print, not a broken file.
+
+    The plan is empty, which leaves the Orchestrator `done` from the start (cursor 0 >= 0), so
+    it never acts on a pause. Upload and print still work.
+    """
+    path = _make_3mf(tmp_path, plate_gcode=_NO_CHANGE_GCODE, filaments=1)
+    plan = JobParser().parse(Job(file=path, printer_id="p1"))
+    assert len(plan) == 0
+    assert plan.swaps == []
+
+
+def test_no_changes_with_unknown_filament_count_is_allowed(tmp_path: Path) -> None:
+    """No slice_info means we cannot tell single-colour from mis-sliced — so allow it."""
+    path = _make_3mf(tmp_path, plate_gcode=_NO_CHANGE_GCODE)  # no slice_info.config
+    assert len(JobParser().parse(Job(file=path, printer_id="p1"))) == 0
+
+
+def test_multi_filament_with_no_changes_is_a_mis_slice(tmp_path: Path) -> None:
+    """Several filaments but zero pauses means it was sliced for the AMS — say so loudly.
+
+    The printer would swap by itself via M620/M621 and AMS-X would sit idle, so this is almost
+    always a slicing mistake rather than an intended job.
+    """
+    path = _make_3mf(tmp_path, plate_gcode=_NO_CHANGE_GCODE, filaments=3)
+    with pytest.raises(JobParseError, match="sliced for the AMS"):
         JobParser().parse(Job(file=path, printer_id="p1"))
 
 

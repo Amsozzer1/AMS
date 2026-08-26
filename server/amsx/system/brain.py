@@ -314,7 +314,7 @@ def build_brain(config_path: str | Path | None = None, *, simulate: bool = True)
     config = load_config(config_path or default_config_path())
     brain = Brain(config, simulate=simulate)
     if not simulate and config.spoolman.enabled:
-        from .inventory.spoolman import SpoolmanStore
+        from amsx.libs.spoolman import SpoolmanStore
 
         brain.store = SpoolmanStore(config.spoolman)
     else:

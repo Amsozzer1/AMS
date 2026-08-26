@@ -106,9 +106,10 @@ Logical pieces:
   stream. Front end reads this cached state; we never need to poll-refresh everything. The
   Pi also tracks **what filament it loaded** into the printer as the authoritative record;
   the printer's own report is cross-checked against it, not trusted blindly.
-- **Printer abstraction** — hides X1/P1 vs A1 differences behind one interface:
-  `unload()`, `feed_until_sensor()`, `load()`, `resume()`, `pause_state()`,
-  `filament_sensor()`, plus `send_job(file)` / `start_print()`.
+- **Printer abstraction** — hides X1/P1 vs A1 differences behind one seam, `PrinterControl`:
+  `routine_unload()`, `routine_extrude()`, `routine_confirm_resume()`, `filament_present()`,
+  `loaded_filament`, plus `send_job(file)` / `start_print(path)`. The orchestrator is typed
+  against this seam, never the concrete `Printer` — see [10-domain-model.md](10-domain-model.md).
 - **Job parser** — unzips a **sliced 3MF**, reads `Metadata/plate_1.gcode`, and builds the
   ordered **material-change plan** (each `M400 U1` pause + its `M1020 S<n>` filament index).
   See [09-filament-change-protocol.md](09-filament-change-protocol.md). No custom slicer;
