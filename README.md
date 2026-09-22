@@ -4,6 +4,10 @@
 > ceiling of Bambu's stock AMS by driving the external-spool filament swap over **local
 > MQTT** — no cloud, no proprietary AMS protocol.
 
+**[What a Bambu printer will let you drive over MQTT](https://amsozzer.com/writing/driving-a-bambu-lab-printer-over-mqtt)**
+— the commands confirmed against an A1 mini, the FTPS traps, and which parts are still a
+guess. Project page: **[amsozzer.com/projects/ams-x](https://amsozzer.com/projects/ams-x)**.
+
 Bambu Lab printers cap multi-material printing at the AMS's 4 slots (16 with the hub), and
 every slot is locked to Bambu's hardware. AMS-X routes around that limit instead of fighting
 it. The printer runs in its native **external-spool mode**, and a central server automates
