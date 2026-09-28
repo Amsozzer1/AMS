@@ -8,6 +8,10 @@
 — the commands confirmed against an A1 mini, the FTPS traps, and which parts are still a
 guess. Project page: **[amsozzer.com/projects/ams-x](https://amsozzer.com/projects/ams-x)**.
 
+The spool-module firmware lives in its own repo, **[Amsozzer1/AMS-Firmware](https://github.com/Amsozzer1/AMS-Firmware)**,
+and **[One ESP32, eight spools, two legs per filament move](https://amsozzer.com/writing/a-filament-move-is-two-legs)**
+covers how it works and what is still missing.
+
 Bambu Lab printers cap multi-material printing at the AMS's 4 slots (16 with the hub), and
 every slot is locked to Bambu's hardware. AMS-X routes around that limit instead of fighting
 it. The printer runs in its native **external-spool mode**, and a central server automates
@@ -81,7 +85,7 @@ This is a monorepo. Each area has its own README with deeper detail.
 |---|---|
 | [server/](server/) | The Brain — Python (FastAPI + async orchestrator + MQTT). Package layout mirrors the domain model. |
 | [frontend/](frontend/) | Operator UI — a thin Next.js/React client that talks only to the Brain's REST API. |
-| [firmware/](firmware/) | ESP32 cluster-controller firmware (PlatformIO). Planned — Phase 1+ hardware track. |
+| [firmware/](firmware/) | Pointer only. The firmware is its own repo: [Amsozzer1/AMS-Firmware](https://github.com/Amsozzer1/AMS-Firmware). |
 | [hardware/](hardware/) | CAD, wiring, and BOM for the modules / hub / clusters. |
 | [deploy/](deploy/) | Docker Compose for the CasaOS host (Brain + Mosquitto broker). |
 | [docs/](docs/) | Design docs: vision, architecture, protocol, domain model, roadmap, hardware. |
@@ -95,7 +99,7 @@ This is a monorepo. Each area has its own README with deeper detail.
 | **Server** | Python 3.11+, FastAPI, `asyncio`, paho-mqtt, Pydantic. Tooling: **uv** (env/deps), **Ruff** (lint + format), **ty** (types), **pytest**. |
 | **Frontend** | Next.js 15 (App Router), React 19, TypeScript. No UI kit or data library — a hand-built design system and a tiny polling hook. |
 | **Transport** | Local MQTT (TLS, LAN mode) for printer + cluster control; FTPS for LAN job upload; HTTP/REST for Spoolman inventory. |
-| **Firmware** | ESP32 / Arduino via PlatformIO; TMC2209 stepper drivers (planned). |
+| **Firmware** | ESP32 / Arduino via PlatformIO, C++17; TMC2209 stepper drivers. Written, not finished — see [AMS-Firmware](https://github.com/Amsozzer1/AMS-Firmware). |
 | **Deploy** | Docker Compose on a CasaOS host — Brain plus a self-hosted Mosquitto broker. |
 
 Rationale for each choice lives in [docs/03-tech-stack.md](docs/03-tech-stack.md).
@@ -160,8 +164,18 @@ hardware is the next physical build.
 - **Simulator-first**: the whole system runs standalone with no printer, backed by ~4,000
   lines of server code and 130+ tests.
 
-**Not yet built** — the motorized `HardwareModule` and its ESP32 cluster firmware, the
-N-module hub, and live X1/P1 verification. These are Phase 1+ on the roadmap.
+**Written, not finished** — the ESP32 cluster firmware now exists as
+[Amsozzer1/AMS-Firmware](https://github.com/Amsozzer1/AMS-Firmware): about 900 lines of C++17,
+eight modules on a shared step/dir bus with per-module enable, a pin map that arrives over MQTT
+and is validated before anything is configured, and moves advanced in bursts so a multi-second
+load never starves the MQTT keep-alive. It has been on the bench with four motors, not eight.
+`Module::sensedFilament()` still returns `false`, so the per-module sensor is never read — which
+costs more going backwards than forwards. On an unload `arrived()` is true the first time it is
+evaluated, so the move stops before it pulses once and **the motor never turns**. Unloading does
+not work yet.
+
+**Not yet built** — the motorized `HardwareModule` on the server side, the N-module hub, and live
+X1/P1 verification. These are Phase 1+ on the roadmap.
 
 The phased plan (riskiest assumption first; no hardware until the software thesis holds) is in
 [docs/04-roadmap.md](docs/04-roadmap.md), with the concrete v0 build in
